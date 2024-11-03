@@ -15,7 +15,9 @@ add_definitions(-DUNICODE)
 # CMake recommends not using GLOB to add files.
 # When a new file is added, the build files (vcxproj, Makefile etc) need to be regenerated.
 # When using GLOB, there is no change to the CMakeLists.txt file, so the build files will not be regenerated.
-set(BirdGame_SOURCES src/main.cpp)
+set(BirdGame_SOURCES
+    src/main.cpp
+    src/Application.cpp)
 
 add_executable(BirdGame WIN32 ${BirdGame_SOURCES})
 

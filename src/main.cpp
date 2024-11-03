@@ -1,3 +1,5 @@
+#include <Application.h>
+
 #include <windows.h>
 
 #include <assert.h>
@@ -6,36 +8,50 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 {
     switch (message)
     {
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-        case WM_KEYDOWN:
-            // Handle key down events
-            return 0;
-        case WM_KEYUP:
-            // Handle key up events
-            return 0;
-        case WM_PAINT:
-            // This will eventually be replaced with our game rendering code
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
-            EndPaint(hWnd, &ps);
-            return 0;
+    case WM_CREATE:
+    {
+        // Initialize the application singleton
+        Application::Initialize();
+        return 0;
     }
-
-    return DefWindowProc(hWnd, message, wParam, lParam);
+    case WM_DESTROY:
+    {
+        PostQuitMessage(0);
+        return 0;
+    }
+    case WM_KEYDOWN:
+    {
+        Application::Instance().KeyDown(static_cast<uint8_t>(wParam));
+        return 0;
+    }
+    case WM_KEYUP:
+    {
+        Application::Instance().KeyUp(static_cast<uint8_t>(wParam));
+        return 0;
+    }
+    case WM_PAINT:
+    {
+        // This will eventually be replaced with our game rendering code
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
+        EndPaint(hWnd, &ps);
+        return 0;
+    }
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
-    const wchar_t CLASS_NAME[]  = L"BirdGame";
+    const wchar_t CLASS_NAME[] = L"BirdGame";
 
     // Initialize and register the window class
-    WNDCLASS wc = { };
+    WNDCLASS wc = {};
 
-    wc.lpfnWndProc   = WindowProc;
-    wc.hInstance     = hInstance;
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
 
     RegisterClass(&wc);
@@ -46,13 +62,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                                L"Bird Game",
                                WS_OVERLAPPEDWINDOW,
                                CW_USEDEFAULT, CW_USEDEFAULT,
-                               288, 512,                          // This width and height matches the resolution of our background image
+                               288, 512, // This width and height matches the resolution of our background image
                                NULL,
                                NULL,
                                hInstance,
                                NULL);
 
-    assert (hWnd != NULL);
+    assert(hWnd != NULL);
 
     ShowWindow(hWnd, nCmdShow);
 
