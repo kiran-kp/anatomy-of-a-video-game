@@ -13,8 +13,8 @@ public:
 
     bool ProcessMessages();
 
-    HWND GetHandle() const { return mHandle; }
+    HWND GetHandle() const { return mHwnd; }
 
 private:
-    HWND mHandle;
+    HWND mHwnd;
 };

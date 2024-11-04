@@ -58,25 +58,25 @@ void Window::Initialize(const wchar_t* title, int windowWidth, int windowHeight,
     RegisterClass(&wc);
 
     // Create the window using the registered window class
-    HWND hWnd = CreateWindowEx(0,
-                               CLASS_NAME,
-                               title,
-                               WS_OVERLAPPEDWINDOW,
-                               CW_USEDEFAULT, CW_USEDEFAULT,
-                               windowWidth, windowHeight, // This width and height matches the resolution of our background image
-                               NULL,
-                               NULL,
-                               hInstance,
-                               NULL);
+    mHwnd = CreateWindowEx(0,
+                           CLASS_NAME,
+                           title,
+                           WS_OVERLAPPEDWINDOW,
+                           CW_USEDEFAULT, CW_USEDEFAULT,
+                           windowWidth, windowHeight, // This width and height matches the resolution of our background image
+                           NULL,
+                           NULL,
+                           hInstance,
+                           NULL);
 
-    assert(hWnd != NULL);
+    assert(mHwnd != NULL);
 
-    ShowWindow(hWnd, nCmdShow);
+    ShowWindow(mHwnd, nCmdShow);
 }
 
 void Window::Shutdown()
 {
-    DestroyWindow(mHandle);
+    DestroyWindow(mHwnd);
 }
 
 bool Window::ProcessMessages()
