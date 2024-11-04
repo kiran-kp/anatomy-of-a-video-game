@@ -95,11 +95,11 @@ void RendererImpl::CreateSwapChain(HWND hwnd)
 
     IDXGISwapChain1* tempSwapChain;
     assert(SUCCEEDED(factory->CreateSwapChainForHwnd(mCommandQueue,
-                                               hwnd,
-                                               &swapChainDesc,
-                                               nullptr,
-                                               nullptr,
-                                               &tempSwapChain)));
+                                                     hwnd,
+                                                     &swapChainDesc,
+                                                     nullptr,
+                                                     nullptr,
+                                                     &tempSwapChain)));
 
     assert(SUCCEEDED(tempSwapChain->QueryInterface(IID_PPV_ARGS(&mSwapChain))));
 
