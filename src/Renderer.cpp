@@ -6,6 +6,8 @@
 
 #include <assert.h>
 
+#define NUM_BACKBUFFERS 2
+
 class RendererImpl
 {
 public:
@@ -20,6 +22,13 @@ private:
     ID3D12Device* mDevice;
     ID3D12CommandQueue* mCommandQueue;
     IDXGISwapChain3* mSwapChain;
+
+    ID3D12DescriptorHeap* mRtvHeap;
+    uint32_t mRtvDescriptorSize;
+
+    ID3D12Resource* mRenderTargets[NUM_BACKBUFFERS];
+
+    uint32_t mFrameIndex;
 };
 
 Renderer::Renderer()
@@ -56,7 +65,7 @@ void RendererImpl::CreateDevice()
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
         {
             debugController->EnableDebugLayer();
-			debugController->Release();
+            debugController->Release();
 
             // Enable additional debug layers.
             dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
@@ -67,7 +76,7 @@ void RendererImpl::CreateDevice()
     IDXGIFactory4* factory;
     assert(SUCCEEDED(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))));
     assert(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))));
-	factory->Release();
+    factory->Release();
 }
 
 void RendererImpl::CreateCommandQueue()
@@ -85,7 +94,7 @@ void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
     assert(SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))));
 
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.BufferCount = 2;
+    swapChainDesc.BufferCount = NUM_BACKBUFFERS;
     swapChainDesc.Width = width;
     swapChainDesc.Height = height;
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -106,4 +115,27 @@ void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
     // Release the temporary swap chain
     tempSwapChain->Release();
     factory->Release();
+
+    mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
+
+    // Create descriptor heaps
+    {
+        // Describe and create a render target view (RTV) descriptor heap.
+        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+        rtvHeapDesc.NumDescriptors = NUM_BACKBUFFERS;
+        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        assert(SUCCEEDED(mDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&mRtvHeap))));
+
+        mRtvDescriptorSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    }
+
+    // Create the render target views
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = mRtvHeap->GetCPUDescriptorHandleForHeapStart();
+    for (size_t i = 0; i < NUM_BACKBUFFERS; i++)
+    {
+        assert(SUCCEEDED(mSwapChain->GetBuffer(i, __uuidof(ID3D12Resource), (LPVOID*)&mRenderTargets[i])));
+        mDevice->CreateRenderTargetView(mRenderTargets[i], NULL, rtv);
+        rtv.ptr += mRtvDescriptorSize;
+    }
 }
