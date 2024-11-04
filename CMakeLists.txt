@@ -16,10 +16,14 @@ add_definitions(-DUNICODE)
 # When a new file is added, the build files (vcxproj, Makefile etc) need to be regenerated.
 # When using GLOB, there is no change to the CMakeLists.txt file, so the build files will not be regenerated.
 set(BirdGame_SOURCES
-    src/main.cpp
-    src/Application.cpp)
+    src/Main.cpp
+    src/Application.cpp
+    src/Renderer.cpp
+    src/Window.cpp)
 
 add_executable(BirdGame WIN32 ${BirdGame_SOURCES})
 
 # Set up include directories.
 target_include_directories(BirdGame PRIVATE include)
+
+target_link_libraries(BirdGame d3d12.lib DXGI.lib d3dcompiler.lib)
