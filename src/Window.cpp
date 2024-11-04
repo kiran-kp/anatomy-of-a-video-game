@@ -30,15 +30,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         Application::Instance().KeyUp(static_cast<uint8_t>(wParam));
         return 0;
     }
-    case WM_PAINT:
-    {
-        // This will eventually be replaced with our game rendering code
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-        FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
-        EndPaint(hWnd, &ps);
-        return 0;
-    }
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
