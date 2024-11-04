@@ -14,7 +14,11 @@ public:
     bool ProcessMessages();
 
     HWND GetHandle() const { return mHwnd; }
+    uint32_t GetWidth() const { return mWidth; }
+    uint32_t GetHeight() const { return mHeight; }
 
 private:
     HWND mHwnd;
+    uint32_t mWidth;
+    uint32_t mHeight;
 };

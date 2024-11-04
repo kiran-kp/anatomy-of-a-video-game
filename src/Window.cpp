@@ -48,6 +48,9 @@ void Window::Initialize(const wchar_t* title, int windowWidth, int windowHeight,
 
     RegisterClass(&wc);
 
+    mWidth = static_cast<uint32_t>(windowWidth);
+    mHeight = static_cast<uint32_t>(windowHeight);
+
     // Create the window using the registered window class
     mHwnd = CreateWindowEx(0,
                            CLASS_NAME,

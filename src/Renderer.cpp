@@ -14,7 +14,7 @@ public:
 
     void CreateDevice();
     void CreateCommandQueue();
-    void CreateSwapChain(HWND hwnd);
+    void CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height);
 
 private:
     ID3D12Device* mDevice;
@@ -35,7 +35,7 @@ void Renderer::Initialize(Window& window)
     mImpl.reset(new RendererImpl());
     mImpl->CreateDevice();
     mImpl->CreateCommandQueue();
-    mImpl->CreateSwapChain(window.GetHandle());
+    mImpl->CreateSwapChain(window.GetHandle(), window.GetWidth(), window.GetHeight());
 }
 
 void Renderer::Shutdown()
@@ -79,15 +79,15 @@ void RendererImpl::CreateCommandQueue()
     assert(SUCCEEDED(mDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue))));
 }
 
-void RendererImpl::CreateSwapChain(HWND hwnd)
+void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
 {
     IDXGIFactory4* factory;
     assert(SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))));
 
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
     swapChainDesc.BufferCount = 2;
-    swapChainDesc.Width = 800;
-    swapChainDesc.Height = 600;
+    swapChainDesc.Width = width;
+    swapChainDesc.Height = height;
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
