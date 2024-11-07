@@ -84,7 +84,6 @@ void Renderer::Initialize(Window& window)
     mImpl->CreateCommandList();
     mImpl->LoadShader();
     mImpl->CreateFence();
-    mImpl->CreateFence();
 
     // Wait for all the setup work we just did to complete because we are going to re-use the command list
     mImpl->WaitForPreviousFrame();
