@@ -10,7 +10,7 @@
 #include <dxcapi.h>
 #include <dxgi1_4.h>
 
-#include <assert.h>
+#define ensure(x) if (!(x)) { int *y = 0; *y = 42; }
 
 // Double buffer so we can continue doing work on the CPU while GPU renders the previous frame.
 // Using a #define here because this is used to set uint32_t or size_t in different contexts and I didn't want cast it every time.
@@ -120,8 +120,8 @@ void RendererImpl::CreateDevice()
 #endif
 
     IDXGIFactory4* factory;
-    assert(SUCCEEDED(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))));
-    assert(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))));
+    ensure(SUCCEEDED(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))));
+    ensure(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))));
     factory->Release();
 }
 
@@ -131,13 +131,13 @@ void RendererImpl::CreateCommandQueue()
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-    assert(SUCCEEDED(mDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue))));
+    ensure(SUCCEEDED(mDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue))));
 }
 
 void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
 {
     IDXGIFactory4* factory;
-    assert(SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))));
+    ensure(SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))));
 
     mWidth = width;
     mHeight = height;
@@ -164,14 +164,14 @@ void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
     swapChainDesc.SampleDesc.Count = 1;
 
     IDXGISwapChain1* tempSwapChain;
-    assert(SUCCEEDED(factory->CreateSwapChainForHwnd(mCommandQueue,
+    ensure(SUCCEEDED(factory->CreateSwapChainForHwnd(mCommandQueue,
                                                      hwnd,
                                                      &swapChainDesc,
                                                      nullptr,
                                                      nullptr,
                                                      &tempSwapChain)));
 
-    assert(SUCCEEDED(tempSwapChain->QueryInterface(IID_PPV_ARGS(&mSwapChain))));
+    ensure(SUCCEEDED(tempSwapChain->QueryInterface(IID_PPV_ARGS(&mSwapChain))));
 
     // Release the temporary swap chain
     tempSwapChain->Release();
@@ -186,7 +186,7 @@ void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
         rtvHeapDesc.NumDescriptors = NUM_BACKBUFFERS;
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        assert(SUCCEEDED(mDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&mRtvHeap))));
+        ensure(SUCCEEDED(mDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&mRtvHeap))));
 
         mRtvDescriptorSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     }
@@ -195,7 +195,7 @@ void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = mRtvHeap->GetCPUDescriptorHandleForHeapStart();
     for (size_t i = 0; i < NUM_BACKBUFFERS; i++)
     {
-        assert(SUCCEEDED(mSwapChain->GetBuffer(static_cast<uint32_t>(i), __uuidof(ID3D12Resource), (LPVOID*)&mRenderTargets[i])));
+        ensure(SUCCEEDED(mSwapChain->GetBuffer(static_cast<uint32_t>(i), __uuidof(ID3D12Resource), (LPVOID*)&mRenderTargets[i])));
         mDevice->CreateRenderTargetView(mRenderTargets[i], NULL, rtv);
         rtv.ptr += mRtvDescriptorSize;
     }
@@ -218,8 +218,8 @@ void RendererImpl::LoadShader()
 
         ID3DBlob* signature;
         ID3DBlob* error;
-        assert(SUCCEEDED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error)));
-        assert(SUCCEEDED(mDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&mRootSignature))));
+        ensure(SUCCEEDED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error)));
+        ensure(SUCCEEDED(mDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&mRootSignature))));
     }
 
     // Create our pipeline
@@ -234,8 +234,8 @@ void RendererImpl::LoadShader()
 #endif
 
         // Load the shader file. This assumes it's in the working directory when the game runs. Make sure to set it in debugging settings.
-        assert(SUCCEEDED(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr)));
-        assert(SUCCEEDED(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)));
+        ensure(SUCCEEDED(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr)));
+        ensure(SUCCEEDED(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)));
 
         // Define the layout for the vertex shader input.
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -259,7 +259,7 @@ void RendererImpl::LoadShader()
         psoDesc.NumRenderTargets = 1;
         psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
         psoDesc.SampleDesc.Count = 1;
-        assert(SUCCEEDED(mDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPipelineState))));
+        ensure(SUCCEEDED(mDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPipelineState))));
     }
 
     // Set up the vertex buffers here for now since this shader is very basic and not doing anything interesting
@@ -280,7 +280,7 @@ void RendererImpl::LoadShader()
         // recommended. Every time the GPU needs it, the upload heap will be marshalled 
         // over. Please read up on Default Heap usage. An upload heap is used here for 
         // code simplicity and because there are very few verts to actually transfer.
-        assert(SUCCEEDED(mDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        ensure(SUCCEEDED(mDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
                                                           D3D12_HEAP_FLAG_NONE,
                                                           &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
                                                           D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -291,7 +291,7 @@ void RendererImpl::LoadShader()
         UINT8* pVertexDataBegin;
         CD3DX12_RANGE readRange(0, 0);
         // "Mapping" a GPU buffer gets us an address for the memory so we can read or write to it. We set read range to 0, 0 since we only want to write now.
-        assert(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
+        ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
         memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
         mVertexBuffer->Unmap(0, nullptr);
 
@@ -304,7 +304,7 @@ void RendererImpl::LoadShader()
 
 void RendererImpl::CreateCommandList()
 {
-    assert(SUCCEEDED(mDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, mCommandAllocator, mPipelineState, IID_PPV_ARGS(&mCommandList))));
+    ensure(SUCCEEDED(mDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, mCommandAllocator, mPipelineState, IID_PPV_ARGS(&mCommandList))));
 
     // The command list is in the recording state when it is created but we have nothing do to at the moment.
     mCommandList->Close();
@@ -313,14 +313,14 @@ void RendererImpl::CreateCommandList()
 // A fence is a synchronization primitive that we can use to signal that the GPU is done rendering a frame
 void RendererImpl::CreateFence()
 {
-    assert(SUCCEEDED(mDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence))));
+    ensure(SUCCEEDED(mDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence))));
     mFenceValue = 1;
 
     // This is the event we will listen for
     mFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     if (mFenceEvent == nullptr)
     {
-        assert(SUCCEEDED(HRESULT_FROM_WIN32(GetLastError())));
+        ensure(SUCCEEDED(HRESULT_FROM_WIN32(GetLastError())));
     }
 }
 
@@ -328,10 +328,10 @@ void RendererImpl::PopulateCommandListAndSubmit()
 {
     // This should only be done after the command list associated with this allocator has finished execution.
     // Ensure that this is only called after WaitForPreviousFrame().
-    assert(SUCCEEDED(mCommandAllocator->Reset()));
+    ensure(SUCCEEDED(mCommandAllocator->Reset()));
 
     // This sets it back to the recording state so we can set up our frame
-    assert(SUCCEEDED(mCommandList->Reset(mCommandAllocator, mPipelineState)));
+    ensure(SUCCEEDED(mCommandList->Reset(mCommandAllocator, mPipelineState)));
 
     // Set up state
     mCommandList->SetGraphicsRootSignature(mRootSignature);
@@ -354,7 +354,7 @@ void RendererImpl::PopulateCommandListAndSubmit()
     // Transition back buffer back to the present state since we are done drawing to it and want it ready for present
     mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-    assert(SUCCEEDED(mCommandList->Close()));
+    ensure(SUCCEEDED(mCommandList->Close()));
 
     ID3D12CommandList* ppCommandLists[] = { mCommandList };
     mCommandQueue->ExecuteCommandLists(1, ppCommandLists);
@@ -362,7 +362,7 @@ void RendererImpl::PopulateCommandListAndSubmit()
 
 void RendererImpl::Present()
 {
-    assert(SUCCEEDED(mSwapChain->Present(1, 0)));
+    ensure(SUCCEEDED(mSwapChain->Present(1, 0)));
 }
 
 void RendererImpl::WaitForPreviousFrame()
@@ -372,13 +372,13 @@ void RendererImpl::WaitForPreviousFrame()
 
     // Signal and increment the fence value.
     const UINT64 fence = mFenceValue;
-    assert(SUCCEEDED(mCommandQueue->Signal(mFence, fence)));
+    ensure(SUCCEEDED(mCommandQueue->Signal(mFence, fence)));
     mFenceValue++;
 
     // Wait until the previous frame is finished.
     if (mFence->GetCompletedValue() < fence)
     {
-        assert(SUCCEEDED(mFence->SetEventOnCompletion(fence, mFenceEvent)));
+        ensure(SUCCEEDED(mFence->SetEventOnCompletion(fence, mFenceEvent)));
         WaitForSingleObject(mFenceEvent, INFINITE);
     }
 
