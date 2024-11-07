@@ -37,6 +37,8 @@ public:
     // We only have one shader at this point so hard code it in the renderer
     void LoadShader();
 
+    void PopulateCommandListAndSubmit();
+    void Present();
     void WaitForPreviousFrame();
 
 private:
@@ -45,6 +47,8 @@ private:
     IDXGISwapChain3* mSwapChain;
     ID3D12CommandAllocator* mCommandAllocator;
 
+    CD3DX12_VIEWPORT mViewport;
+    CD3DX12_RECT mScissorRect;
     uint32_t mWidth;
     uint32_t mHeight;
     float mAspectRatio;
@@ -77,7 +81,9 @@ void Renderer::Initialize(Window& window)
     mImpl->CreateDevice();
     mImpl->CreateCommandQueue();
     mImpl->CreateSwapChain(window.GetHandle(), window.GetWidth(), window.GetHeight());
+    mImpl->CreateCommandList();
     mImpl->LoadShader();
+    mImpl->CreateFence();
     mImpl->CreateFence();
 
     // Wait for all the setup work we just did to complete because we are going to re-use the command list
@@ -90,6 +96,9 @@ void Renderer::Shutdown()
 
 void Renderer::Render()
 {
+    mImpl->PopulateCommandListAndSubmit();
+    mImpl->Present();
+    mImpl->WaitForPreviousFrame();
 }
 
 void RendererImpl::CreateDevice()
@@ -133,7 +142,17 @@ void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
     mWidth = width;
     mHeight = height;
     mAspectRatio = static_cast<float>(width) / static_cast<float>(height);
-    
+    mViewport.TopLeftX = 0.0f;
+    mViewport.TopLeftY = 0.0f;
+    mViewport.Width = static_cast<float>(width);
+    mViewport.Height = static_cast<float>(height);
+    mViewport.MinDepth = D3D12_MIN_DEPTH;
+    mViewport.MaxDepth = D3D12_MAX_DEPTH;
+
+    mScissorRect.left = 0;
+    mScissorRect.top = 0;
+    mScissorRect.right= width;
+    mScissorRect.bottom = height;
 
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
     swapChainDesc.BufferCount = NUM_BACKBUFFERS;
@@ -303,6 +322,47 @@ void RendererImpl::CreateFence()
     {
         assert(SUCCEEDED(HRESULT_FROM_WIN32(GetLastError())));
     }
+}
+
+void RendererImpl::PopulateCommandListAndSubmit()
+{
+    // This should only be done after the command list associated with this allocator has finished execution.
+    // Ensure that this is only called after WaitForPreviousFrame().
+    assert(SUCCEEDED(mCommandAllocator->Reset()));
+
+    // This sets it back to the recording state so we can set up our frame
+    assert(SUCCEEDED(mCommandList->Reset(mCommandAllocator, mPipelineState)));
+
+    // Set up state
+    mCommandList->SetGraphicsRootSignature(mRootSignature);
+    mCommandList->RSSetViewports(1, &mViewport);
+    mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+    // Transition our back buffer to be able to be used as a render target since we're rendering to it
+    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(mRtvHeap->GetCPUDescriptorHandleForHeapStart(), mFrameIndex, mRtvDescriptorSize);
+    mCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+    // This is the actual stuff we are drawing
+    const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+    mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    mCommandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
+    mCommandList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition back buffer back to the present state since we are done drawing to it and want it ready for present
+    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+    assert(SUCCEEDED(mCommandList->Close()));
+
+    ID3D12CommandList* ppCommandLists[] = { mCommandList };
+    mCommandQueue->ExecuteCommandLists(1, ppCommandLists);
+}
+
+void RendererImpl::Present()
+{
+    assert(SUCCEEDED(mSwapChain->Present(1, 0)));
 }
 
 void RendererImpl::WaitForPreviousFrame()
