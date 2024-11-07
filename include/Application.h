@@ -18,8 +18,8 @@ public:
     void Run();
 
     // Events that are triggered from the Windows message loop
-    void KeyDown(uint8_t key);
-    void KeyUp(uint8_t key);
+    void KeyDown();
+    void KeyUp();
 
 private:
     // The constructors are private/deleted to prevent instantiation of the singleton outside of the Initialize function.

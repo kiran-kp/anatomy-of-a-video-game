@@ -42,10 +42,10 @@ void Application::Render()
     mRenderer.Render();
 }
 
-void Application::KeyDown(uint8_t key)
+void Application::KeyDown()
 {
 }
 
-void Application::KeyUp(uint8_t key)
+void Application::KeyUp()
 {
 }

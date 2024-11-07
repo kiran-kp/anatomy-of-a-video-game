@@ -20,14 +20,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         PostQuitMessage(0);
         return 0;
     }
-    case WM_KEYDOWN:
+    case WM_MBUTTONDOWN:
     {
-        Application::Instance().KeyDown(static_cast<uint8_t>(wParam));
         return 0;
     }
-    case WM_KEYUP:
+    case WM_MBUTTONUP:
     {
-        Application::Instance().KeyUp(static_cast<uint8_t>(wParam));
         return 0;
     }
     default:
