@@ -67,11 +67,12 @@ void Logger::ProcessQueue()
 
             printf("[%lld] %s:%d - %s\n", next->mTimestamp, next->mFile.c_str(), next->mLine, next->mMessage.c_str());
             fprintf(mFile, "[%lld] %s:%d - %s\n", next->mTimestamp, next->mFile.c_str(), next->mLine, next->mMessage.c_str());
-            fflush(mFile);
         }
         else
         {
             break;
         }
     }
+
+    fflush(mFile);
 }
