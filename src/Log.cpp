@@ -34,10 +34,10 @@ Logger& Logger::Get()
 
 Logger::Logger()
 {
-    auto dummp = new LogMessage("", 0, 0, 0, "", nullptr);
-    dummp->mNext.store(nullptr);
-    mHead.store(dummp);
-    mTail = dummp;
+    auto dummy = new LogMessage("", 0, 0, 0, "", nullptr);
+    dummy->mNext.store(nullptr);
+    mHead.store(dummy);
+    mTail = dummy;
 
     auto err = fopen_s(&mFile, "log.txt", "w");
 }
