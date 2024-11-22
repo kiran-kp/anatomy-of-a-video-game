@@ -1,4 +1,6 @@
 #include <Renderer.h>
+#include <Log.h>
+#include <Util.h>
 #include <Window.h>
 
 // This helper library has to be included before any SDK headers
@@ -9,8 +11,6 @@
 #include <DirectXMath.h>
 #include <dxcapi.h>
 #include <dxgi1_4.h>
-
-#define ensure(x) if (!(x)) { int *y = 0; *y = 42; }
 
 // Double buffer so we can continue doing work on the CPU while GPU renders the previous frame.
 // Using a #define here because this is used to set uint32_t or size_t in different contexts and I didn't want cast it every time.
