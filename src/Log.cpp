@@ -14,11 +14,10 @@ public:
     uint64_t mThreadId;
     std::string mMessage;
     std::atomic<LogMessage*> mNext;
-    std::atomic<bool> mFree;
 };
 
 LogMessage::LogMessage(std::string_view file, int line, uint64_t timestamp, uint64_t threadId, std::string_view format, va_list args)
-    : mFile(file), mLine(line), mTimestamp(timestamp), mThreadId(threadId), mFree(false)
+    : mFile(file), mLine(line), mTimestamp(timestamp), mThreadId(threadId)
 {
     // Temporarily just format the string here. I eventually want to save the args as is and format offline.
     char buffer[4096];
