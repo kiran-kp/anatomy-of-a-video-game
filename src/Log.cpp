@@ -65,8 +65,11 @@ void Logger::ProcessQueue()
             delete tail;
             mTail = next;
 
-            printf("[%lld] %s:%d - %s\n", next->mTimestamp, next->mFile.c_str(), next->mLine, next->mMessage.c_str());
-            fprintf(mFile, "[%lld] %s:%d - %s\n", next->mTimestamp, next->mFile.c_str(), next->mLine, next->mMessage.c_str());
+            char buffer[4096];
+            snprintf(buffer, sizeof(buffer), "[%lld] %s:%d - %s\n", next->mTimestamp, next->mFile.c_str(), next->mLine, next->mMessage.c_str());
+
+            printf(buffer);
+            fprintf(mFile, buffer);
         }
         else
         {
