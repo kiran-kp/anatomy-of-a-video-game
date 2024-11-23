@@ -24,7 +24,7 @@ public:
 
     void Initialize(ID3D12Device* device, float width, float height);
 
-    void Render(ID3D12GraphicsCommandList* commandList, uint32_t frameIndex);
+    void Render(ID3D12GraphicsCommandList* commandList);
 
 private:
 
@@ -250,7 +250,7 @@ void RendererImpl::PopulateCommandListAndSubmit()
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-    mTriangleRenderer.Render(mCommandList, mFrameIndex);
+    mTriangleRenderer.Render(mCommandList);
 
     // Transition back buffer back to the present state since we are done drawing to it and want it ready for present
     mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -405,7 +405,7 @@ void TriangleRenderer::Initialize(ID3D12Device* device, float width, float heigh
     }
 }
 
-void TriangleRenderer::Render(ID3D12GraphicsCommandList* commandList, uint32_t frameIndex)
+void TriangleRenderer::Render(ID3D12GraphicsCommandList* commandList)
 {
     commandList->SetGraphicsRootSignature(mRootSignature);
     commandList->SetPipelineState(mPipelineState);
