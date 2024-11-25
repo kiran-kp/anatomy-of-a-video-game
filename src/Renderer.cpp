@@ -384,11 +384,11 @@ void TriangleRenderer::Initialize(ID3D12Device* device, float width, float heigh
         // over. Please read up on Default Heap usage. An upload heap is used here for 
         // code simplicity and because there are very few verts to actually transfer.
         ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-                                                          D3D12_HEAP_FLAG_NONE,
-                                                          &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
-                                                          D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                          nullptr,
-                                                          IID_PPV_ARGS(&mVertexBuffer))));
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
+                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&mVertexBuffer))));
 
         // Copy the triangle data to the vertex buffer.
         UINT8* pVertexDataBegin;
