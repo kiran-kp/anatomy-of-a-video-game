@@ -65,7 +65,6 @@ void TriangleRenderer::Initialize(ID3D12Device* device, float width, float heigh
     mScissorRect.right= static_cast<uint64_t>(width);
     mScissorRect.bottom = static_cast<uint64_t>(height);
 
-
     // Create a root signature. This data structure describes what resources are bound to the pipeline at each shader stage.
     // In our case, we don't need anything yet.
     {
@@ -94,8 +93,8 @@ void TriangleRenderer::Initialize(ID3D12Device* device, float width, float heigh
 #endif
 
         // Load the shader file. This assumes it's in the working directory when the game runs. Make sure to set it in debugging settings.
-        ensure(SUCCEEDED(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr)));
-        ensure(SUCCEEDED(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)));
+        ensure(SUCCEEDED(D3DCompileFromFile(L"data/basic.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr)));
+        ensure(SUCCEEDED(D3DCompileFromFile(L"data/basic.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)));
 
         // Define the layout for the vertex shader input.
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -177,6 +176,285 @@ void TriangleRenderer::Render(ID3D12GraphicsCommandList* commandList)
 
 // ------------------------------------------------------------------------------------------------
 
+class TexturedTriangleRenderer
+{
+public:
+    TexturedTriangleRenderer() = default;
+    ~TexturedTriangleRenderer();
+
+    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float width, float height);
+    void Render(ID3D12GraphicsCommandList* commandList);
+
+private:
+    static constexpr uint32_t TextureWidth = 256;
+    static constexpr uint32_t TextureHeight = 256;
+    static constexpr uint32_t TexturePixelSize = 4;
+
+    struct Vertex
+    {
+        DirectX::XMFLOAT3 position;
+        DirectX::XMFLOAT2 uv;
+    };
+
+    CD3DX12_VIEWPORT mViewport;
+    CD3DX12_RECT mScissorRect;
+
+    ID3D12RootSignature* mRootSignature;
+    ID3D12PipelineState* mPipelineState;
+    ID3D12Resource* mVertexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW mVertexBufferView;
+
+    ID3D12DescriptorHeap* mSrvHeap;
+    ID3D12Resource* mTexture;
+};
+
+TexturedTriangleRenderer::~TexturedTriangleRenderer()
+{
+    mRootSignature->Release();
+    mPipelineState->Release();
+    mVertexBuffer->Release();
+    mTexture->Release();
+}
+
+std::vector<uint8_t> GenerateTextureData(const uint32_t textureWidth, const uint32_t textureHeight, const uint32_t texturePixelSize)
+{
+    const uint32_t rowPitch = textureWidth * texturePixelSize;
+    const uint32_t cellPitch = rowPitch >> 3;
+    const uint32_t cellHeight = textureWidth >> 3;
+    const uint32_t textureSize = rowPitch * textureHeight;
+
+    std::vector<uint8_t> data(textureSize);
+    uint8_t* pData = &data[0];
+
+    for (uint32_t n = 0; n < textureSize; n += texturePixelSize)
+    {
+        uint32_t x = n % rowPitch;
+        uint32_t y = n / rowPitch;
+        uint32_t i = x / cellPitch;
+        uint32_t j = y / cellHeight;
+
+        if (i % 2 == j % 2)
+        {
+            pData[n] = 0x00;        // R
+            pData[n + 1] = 0x00;    // G
+            pData[n + 2] = 0x00;    // B
+            pData[n + 3] = 0xff;    // A
+        }
+        else
+        {
+            pData[n] = 0xff;        // R
+            pData[n + 1] = 0xff;    // G
+            pData[n + 2] = 0xff;    // B
+            pData[n + 3] = 0xff;    // A
+        }
+    }
+
+    return data;
+}
+
+void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float width, float height)
+{
+    float aspectRatio = width / height;
+    mViewport.TopLeftX = 0.0f;
+    mViewport.TopLeftY = 0.0f;
+    mViewport.Width = width;
+    mViewport.Height = height;
+    mViewport.MinDepth = D3D12_MIN_DEPTH;
+    mViewport.MaxDepth = D3D12_MAX_DEPTH;
+
+    mScissorRect.left = 0;
+    mScissorRect.top = 0;
+    mScissorRect.right= static_cast<uint64_t>(width);
+    mScissorRect.bottom = static_cast<uint64_t>(height);
+
+    // Describe and create a shader resource view (SRV) heap for the texture.
+    D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+    srvHeapDesc.NumDescriptors = 1;
+    srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    ensure(SUCCEEDED(device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvHeap))));
+
+    // Create root signature
+    {
+        CD3DX12_DESCRIPTOR_RANGE ranges[1];
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+
+        CD3DX12_ROOT_PARAMETER rootParameters[1];
+        rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
+
+        D3D12_STATIC_SAMPLER_DESC sampler = {};
+        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.MipLODBias = 0;
+        sampler.MaxAnisotropy = 0;
+        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler.MinLOD = 0.0f;
+        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+        sampler.ShaderRegister = 0;
+        sampler.RegisterSpace = 0;
+        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.Init((UINT)1, rootParameters, (UINT)1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        ID3DBlob* signature;
+        ID3DBlob* error;
+        ensure(SUCCEEDED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error)));
+        ensure(SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&mRootSignature))));
+    }
+
+    // Create our pipeline
+    {
+        ID3DBlob* vertexShader;
+        ID3DBlob* pixelShader;
+
+#if defined(_DEBUG)
+        UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+        UINT compileFlags = 0;
+#endif
+
+        // Load the shader file. This assumes it's in the working directory when the game runs. Make sure to set it in debugging settings.
+        auto result = D3DCompileFromFile(L"data/textured.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr);
+        LOG("Compile result: %d", result);
+        ensure(SUCCEEDED(result));
+        ensure(SUCCEEDED(D3DCompileFromFile(L"data/textured.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)));
+
+        // Define the layout for the vertex shader input.
+        D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+        {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        };
+
+        // Create the pipeline state object (PSO). This describes everything required to run this specific shader.
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+        psoDesc.pRootSignature = mRootSignature;
+        psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader);
+        psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader);
+        psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+        psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+        psoDesc.DepthStencilState.DepthEnable = FALSE;
+        psoDesc.DepthStencilState.StencilEnable = FALSE;
+        psoDesc.SampleMask = UINT_MAX;
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        psoDesc.NumRenderTargets = 1;
+        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        psoDesc.SampleDesc.Count = 1;
+        ensure(SUCCEEDED(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPipelineState))));
+    }
+
+    // Set up the vertex buffers here for now since this shader is very basic and not doing anything interesting
+    {
+        Vertex triangleVertices[] =
+        {
+            { { 0.0f, 0.25f * aspectRatio, 0.0f }, { 0.5f, 0.0f } },
+            { { 0.25f, -0.25f * aspectRatio, 0.0f }, { 1.0f, 1.0f } },
+            { { -0.25f, -0.25f * aspectRatio, 0.0f }, { 0.0f, 1.0f } }
+        };
+
+        const uint32_t vertexBufferSize = sizeof(triangleVertices);
+
+        // TODO: Keeping this comment from sample code as is.
+        // I don't understand what this means at the moment so we'll worry about best practice for uploading vertices to GPU later.
+
+        // Note: using upload heaps to transfer static data like vert buffers is not 
+        // recommended. Every time the GPU needs it, the upload heap will be marshalled 
+        // over. Please read up on Default Heap usage. An upload heap is used here for 
+        // code simplicity and because there are very few verts to actually transfer.
+        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
+                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&mVertexBuffer))));
+
+        // Copy the triangle data to the vertex buffer.
+        UINT8* pVertexDataBegin;
+        CD3DX12_RANGE readRange(0, 0);
+        // "Mapping" a GPU buffer gets us an address for the memory so we can read or write to it. We set read range to 0, 0 since we only want to write now.
+        ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
+        memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
+        mVertexBuffer->Unmap(0, nullptr);
+
+        // Initialize the vertex buffer view.
+        mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
+        mVertexBufferView.StrideInBytes = sizeof(Vertex);
+        mVertexBufferView.SizeInBytes = vertexBufferSize;
+    }
+
+    {
+        // Describe and create a Texture2D.
+        D3D12_RESOURCE_DESC textureDesc = {};
+        textureDesc.MipLevels = 1;
+        textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        textureDesc.Width = TextureWidth;
+        textureDesc.Height = TextureHeight;
+        textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        textureDesc.DepthOrArraySize = 1;
+        textureDesc.SampleDesc.Count = 1;
+        textureDesc.SampleDesc.Quality = 0;
+        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &textureDesc,
+                                                         D3D12_RESOURCE_STATE_COPY_DEST,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&mTexture))));
+
+        const UINT64 uploadBufferSize = GetRequiredIntermediateSize(mTexture, 0, 1);
+
+        // Create the GPU upload buffer.
+        ID3D12Resource* textureUploadHeap;
+        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
+                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&textureUploadHeap))));
+
+        // Copy data to the intermediate upload heap and then schedule a copy 
+        // from the upload heap to the Texture2D.
+        std::vector<uint8_t> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
+
+        D3D12_SUBRESOURCE_DATA textureData = {};
+        textureData.pData = &texture[0];
+        textureData.RowPitch = TextureWidth * TexturePixelSize;
+        textureData.SlicePitch = textureData.RowPitch * TextureHeight;
+
+        UpdateSubresources(commandList, mTexture, textureUploadHeap, 0, 0, 1, &textureData);
+        commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mTexture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+
+        // Describe and create a SRV for the texture.
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Format = textureDesc.Format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = 1;
+        device->CreateShaderResourceView(mTexture, &srvDesc, mSrvHeap->GetCPUDescriptorHandleForHeapStart());
+    }
+}
+
+void TexturedTriangleRenderer::Render(ID3D12GraphicsCommandList* commandList)
+{
+    commandList->SetGraphicsRootSignature(mRootSignature);
+    commandList->SetPipelineState(mPipelineState);
+    commandList->SetGraphicsRootDescriptorTable(0, mSrvHeap->GetGPUDescriptorHandleForHeapStart());
+    commandList->RSSetViewports(1, &mViewport);
+    commandList->RSSetScissorRects(1, &mScissorRect);
+
+    // This is the actual stuff we are drawing
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
+    commandList->DrawInstanced(3, 1, 0, 0);
+}
+
+
+// ------------------------------------------------------------------------------------------------
 class RendererImpl
 {
 public:
@@ -210,7 +488,7 @@ private:
     ID3D12Resource* mRenderTargets[NUM_BACKBUFFERS];
     ID3D12GraphicsCommandList* mCommandList;
 
-    TriangleRenderer mTriangleRenderer;
+    TexturedTriangleRenderer mTriangleRenderer;
 
     uint32_t mFrameIndex;
     ID3D12Fence* mFence;
@@ -333,7 +611,7 @@ void RendererImpl::CreateFence()
 
 void RendererImpl::InitializeTriangleRenderer()
 {
-    mTriangleRenderer.Initialize(mDevice, static_cast<float>(mWidth), static_cast<float>(mHeight));
+    mTriangleRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
 }
 
 void RendererImpl::PopulateCommandListAndSubmit()

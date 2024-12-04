@@ -32,6 +32,7 @@ public class BirdGameProject : Project
         conf.LibraryFiles.Add("d3d12");
         conf.LibraryFiles.Add("dxgi");
         conf.LibraryFiles.Add("d3dcompiler");
+        conf.LibraryFiles.Add("dxguid");
     }
 }
 
