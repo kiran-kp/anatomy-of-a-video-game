@@ -175,6 +175,8 @@ void TriangleRenderer::Render(ID3D12GraphicsCommandList* commandList)
     commandList->DrawInstanced(3, 1, 0, 0);
 }
 
+// ------------------------------------------------------------------------------------------------
+
 class RendererImpl
 {
 public:
@@ -387,6 +389,8 @@ void RendererImpl::WaitForPreviousFrame()
 
     mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 }
+
+// ------------------------------------------------------------------------------------------------
 
 Renderer::Renderer() = default;
 
