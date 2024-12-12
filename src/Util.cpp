@@ -2,7 +2,8 @@
 
 #include <fstream>
 
-auto slurp(std::string_view path) -> std::string {
+std::string slurp(std::string_view path)
+{
     constexpr auto read_size = std::size_t(4096);
     auto stream = std::ifstream(path.data());
     stream.exceptions(std::ios_base::badbit);
