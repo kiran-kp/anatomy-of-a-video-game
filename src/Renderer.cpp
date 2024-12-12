@@ -12,7 +12,6 @@
 #include <dxcapi.h>
 #include <dxgi1_4.h>
 
-// Double buffer so we can continue doing work on the CPU while GPU renders the previous frame.
 // Using a #define here because this is used to set uint32_t or size_t in different contexts and I didn't want cast it every time.
 #define NUM_BACKBUFFERS 2
 
@@ -22,7 +21,7 @@ public:
     TriangleRenderer() = default;
     ~TriangleRenderer();
 
-    void Initialize(ID3D12Device* device, float width, float height);
+    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float width, float height);
 
     void Render(ID3D12GraphicsCommandList* commandList);
 
@@ -50,7 +49,7 @@ TriangleRenderer::~TriangleRenderer()
     mVertexBuffer->Release();
 }
 
-void TriangleRenderer::Initialize(ID3D12Device* device, float width, float height)
+void TriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float width, float height)
 {
     float aspectRatio = width / height;
     mViewport.TopLeftX = 0.0f;
@@ -277,7 +276,7 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
     // Create root signature
     {
         CD3DX12_DESCRIPTOR_RANGE ranges[1];
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);  // 1 SRV at register t0
 
         CD3DX12_ROOT_PARAMETER rootParameters[1];
         rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -293,7 +292,7 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
         sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
         sampler.MinLOD = 0.0f;
         sampler.MaxLOD = D3D12_FLOAT32_MAX;
-        sampler.ShaderRegister = 0;
+        sampler.ShaderRegister = 0;  // This matches s0 in the shader
         sampler.RegisterSpace = 0;
         sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
@@ -304,6 +303,9 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
         ID3DBlob* error;
         ensure(SUCCEEDED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error)));
         ensure(SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&mRootSignature))));
+        
+        signature->Release();
+        if (error) error->Release();
     }
 
     // Create our pipeline
@@ -318,16 +320,14 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
 #endif
 
         // Load the shader file. This assumes it's in the working directory when the game runs. Make sure to set it in debugging settings.
-        auto result = D3DCompileFromFile(L"data/textured.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr);
-        LOG("Compile result: %d", result);
-        ensure(SUCCEEDED(result));
+        ensure(SUCCEEDED(D3DCompileFromFile(L"data/textured.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr)));
         ensure(SUCCEEDED(D3DCompileFromFile(L"data/textured.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)));
 
         // Define the layout for the vertex shader input.
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
         {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
         };
 
         // Create the pipeline state object (PSO). This describes everything required to run this specific shader.
@@ -359,13 +359,7 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
 
         const uint32_t vertexBufferSize = sizeof(triangleVertices);
 
-        // TODO: Keeping this comment from sample code as is.
-        // I don't understand what this means at the moment so we'll worry about best practice for uploading vertices to GPU later.
-
-        // Note: using upload heaps to transfer static data like vert buffers is not 
-        // recommended. Every time the GPU needs it, the upload heap will be marshalled 
-        // over. Please read up on Default Heap usage. An upload heap is used here for 
-        // code simplicity and because there are very few verts to actually transfer.
+        // Just using an upload heap directly for this since performance doesn't matter
         ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
                                                          D3D12_HEAP_FLAG_NONE,
                                                          &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
@@ -441,6 +435,10 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
 
 void TexturedTriangleRenderer::Render(ID3D12GraphicsCommandList* commandList)
 {
+    // Have to set the descriptor heap before setting the root signature
+    ID3D12DescriptorHeap* heaps[] = { mSrvHeap };
+    commandList->SetDescriptorHeaps(1, heaps);
+
     commandList->SetGraphicsRootSignature(mRootSignature);
     commandList->SetPipelineState(mPipelineState);
     commandList->SetGraphicsRootDescriptorTable(0, mSrvHeap->GetGPUDescriptorHandleForHeapStart());
@@ -515,8 +513,11 @@ void RendererImpl::CreateDevice()
 #endif
 
     IDXGIFactory4* factory;
+    IDXGIAdapter1* adapter;
     ensure(SUCCEEDED(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))));
-    ensure(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))));
+    // Ignore this line. I'm testing in a VM and don't have a GPU so I'm using the warp adapter which is basically a software renderer.
+    ensure(SUCCEEDED(factory->EnumWarpAdapter(IID_PPV_ARGS(&adapter))));
+    ensure(SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))));
     factory->Release();
 }
 
@@ -611,7 +612,14 @@ void RendererImpl::CreateFence()
 
 void RendererImpl::InitializeTriangleRenderer()
 {
+    ensure(SUCCEEDED(mCommandList->Reset(mCommandAllocator, nullptr)));
+ 
     mTriangleRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
+ 
+    // Close the command list and execute it to begin the initial GPU setup.
+    ensure(SUCCEEDED(mCommandList->Close()));
+    ID3D12CommandList* commandLists[] = { mCommandList };
+    mCommandQueue->ExecuteCommandLists(1, commandLists);
 }
 
 void RendererImpl::PopulateCommandListAndSubmit()
@@ -639,8 +647,8 @@ void RendererImpl::PopulateCommandListAndSubmit()
 
     ensure(SUCCEEDED(mCommandList->Close()));
 
-    ID3D12CommandList* ppCommandLists[] = { mCommandList };
-    mCommandQueue->ExecuteCommandLists(1, ppCommandLists);
+    ID3D12CommandList* commandLists[] = { mCommandList };
+    mCommandQueue->ExecuteCommandLists(1, commandLists);
 }
 
 void RendererImpl::Present()
