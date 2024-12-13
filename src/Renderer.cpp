@@ -968,10 +968,10 @@ void RendererImpl::CreateDevice()
 #endif
 
     IDXGIFactory4* factory;
-    IDXGIAdapter1* adapter;
+    IDXGIAdapter1* adapter = nullptr;
     ensure(SUCCEEDED(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))));
     // Ignore this line. I'm testing in a VM and don't have a GPU so I'm using the warp adapter which is basically a software renderer.
-    ensure(SUCCEEDED(factory->EnumWarpAdapter(IID_PPV_ARGS(&adapter))));
+    // ensure(SUCCEEDED(factory->EnumWarpAdapter(IID_PPV_ARGS(&adapter))));
     ensure(SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))));
     factory->Release();
 }
