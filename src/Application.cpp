@@ -38,6 +38,7 @@ void Application::Run()
 void Application::Update()
 {
     LOGGER_FLUSH();
+    mRenderer.AddDebugText("Hello World!", 100, 100);
 }
 
 void Application::Render()

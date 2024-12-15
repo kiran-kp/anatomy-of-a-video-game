@@ -462,7 +462,8 @@ public:
     ~TextRenderer();
 
     void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
-    void RenderText(ID3D12GraphicsCommandList* commandList, std::string_view text, float x, float y, float scale = 1.0f);
+    void Render(ID3D12GraphicsCommandList* commandList);
+    void AddDebugText(std::string_view text, int32_t x, int32_t y);
 
 private:
     struct Vertex
@@ -486,6 +487,17 @@ private:
 
     float mScreenWidth = 0;
     float mScreenHeight = 0;
+
+    struct StringRefs
+    {
+        int32_t x;
+        int32_t y;
+        size_t start;
+        size_t length;
+    };
+
+    std::vector<char> mStrings;
+    std::vector<StringRefs> mStringRefs;
 }; 
 
 TextRenderer::~TextRenderer()
@@ -855,38 +867,46 @@ namespace Font
     }
 }
 
-void TextRenderer::RenderText(ID3D12GraphicsCommandList* commandList, std::string_view text, float x, float y, float scale)
+void TextRenderer::Render(ID3D12GraphicsCommandList* commandList)
 {
     // Map vertex buffer
     Vertex* vertices;
     CD3DX12_RANGE readRange(0, 0);
     ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&vertices))));
 
-    const float charWidth = (Font::CharWidth * scale) / mScreenWidth * 2.0f;
-    const float charHeight = (Font::CharHeight * scale) / mScreenHeight * 2.0f;
-    float currentX = (x / mScreenWidth * 2.0f) - 1.0f;
-    float currentY = 1.0f - (y / mScreenHeight * 2.0f);
-
     uint32_t vertexCount = 0;
-    for (char c : text)
+
+    for (const auto& ref : mStringRefs)
     {
-        if (vertexCount + 6 > MaxCharacters * 6) break;
+        const float charWidth = (Font::CharWidth / mScreenWidth) * 2.0f;
+        const float charHeight = (Font::CharHeight / mScreenHeight) * 2.0f;
+        float currentX = ((ref.x / mScreenWidth) * 2.0f) - 1.0f;
+        float currentY = 1.0f - ((ref.y / mScreenHeight) * 2.0f);
+        std::string_view text = std::string_view(mStrings.data() + ref.start, ref.length);
 
-        float u1, v1, u2, v2;
-        Font::GetCharacterUVs(c, u1, v1, u2, v2);
+        for (char c : text)
+        {
+            if (vertexCount + 6 > MaxCharacters * 6) break;
 
-        // First triangle
-        vertices[vertexCount++] = { { currentX, currentY, 0.0f }, { u1, v1 } };
-        vertices[vertexCount++] = { { currentX + charWidth, currentY - charHeight, 0.0f }, { u2, v2 } };
-        vertices[vertexCount++] = { { currentX, currentY - charHeight, 0.0f }, { u1, v2 } };
+            float u1, v1, u2, v2;
+            Font::GetCharacterUVs(c, u1, v1, u2, v2);
 
-        // Second triangle
-        vertices[vertexCount++] = { { currentX, currentY, 0.0f }, { u1, v1 } };
-        vertices[vertexCount++] = { { currentX + charWidth, currentY, 0.0f }, { u2, v1 } };
-        vertices[vertexCount++] = { { currentX + charWidth, currentY - charHeight, 0.0f }, { u2, v2 } };
+            // First triangle
+            vertices[vertexCount++] = { { currentX, currentY, 0.0f }, { u1, v1 } };
+            vertices[vertexCount++] = { { currentX + charWidth, currentY - charHeight, 0.0f }, { u2, v2 } };
+            vertices[vertexCount++] = { { currentX, currentY - charHeight, 0.0f }, { u1, v2 } };
 
-        currentX += charWidth;
+            // Second triangle
+            vertices[vertexCount++] = { { currentX, currentY, 0.0f }, { u1, v1 } };
+            vertices[vertexCount++] = { { currentX + charWidth, currentY, 0.0f }, { u2, v1 } };
+            vertices[vertexCount++] = { { currentX + charWidth, currentY - charHeight, 0.0f }, { u2, v2 } };
+
+            currentX += charWidth;
+        }
     }
+
+    mStrings.clear();
+    mStringRefs.clear();
 
     mVertexBuffer->Unmap(0, nullptr);
 
@@ -903,7 +923,15 @@ void TextRenderer::RenderText(ID3D12GraphicsCommandList* commandList, std::strin
 
     commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
     commandList->DrawInstanced(vertexCount, 1, 0, 0);
-} 
+}
+
+void TextRenderer::AddDebugText(std::string_view text, int32_t x, int32_t y)
+{
+    ensure((mStrings.size() + text.size()) < MaxCharacters);
+    const size_t start = mStrings.size();
+    mStrings.insert(mStrings.end(), text.begin(), text.end());
+    mStringRefs.push_back({ x, y, start, text.size() });
+}
 
 // ------------------------------------------------------------------------------------------------
 
@@ -924,6 +952,8 @@ public:
     void PopulateCommandListAndSubmit();
     void Present();
     void WaitForPreviousFrame();
+
+    void AddDebugText(std::string_view text, int32_t x, int32_t y);
 
 private:
     ID3D12Device* mDevice;
@@ -1097,7 +1127,7 @@ void RendererImpl::PopulateCommandListAndSubmit()
     mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
     mTriangleRenderer.Render(mCommandList);
-    mTextRenderer.RenderText(mCommandList, "Hello World!", 100.0f, 100.0f, 1.0f);
+    mTextRenderer.Render(mCommandList);
     // Transition back buffer back to the present state since we are done drawing to it and want it ready for present
     mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
@@ -1132,6 +1162,11 @@ void RendererImpl::WaitForPreviousFrame()
     mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 }
 
+void RendererImpl::AddDebugText(std::string_view text, int32_t x, int32_t y)
+{
+    mTextRenderer.AddDebugText(text, x, y);
+}
+
 // ------------------------------------------------------------------------------------------------
 
 Renderer::Renderer() = default;
@@ -1162,4 +1197,9 @@ void Renderer::Render()
     mImpl->PopulateCommandListAndSubmit();
     mImpl->Present();
     mImpl->WaitForPreviousFrame();
+}
+
+void Renderer::AddDebugText(std::string_view text, int32_t x, int32_t y)
+{
+    mImpl->AddDebugText(text, x, y);
 }
