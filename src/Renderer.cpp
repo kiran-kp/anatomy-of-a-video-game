@@ -874,15 +874,15 @@ void TextRenderer::Render(ID3D12GraphicsCommandList* commandList)
     CD3DX12_RANGE readRange(0, 0);
     ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&vertices))));
 
-    uint32_t vertexCount = 0;
+    const float charWidth = (Font::CharWidth / mScreenWidth) * 2.0f;
+    const float charHeight = (Font::CharHeight / mScreenHeight) * 2.0f;
 
+    uint32_t vertexCount = 0;
     for (const auto& ref : mStringRefs)
     {
-        const float charWidth = (Font::CharWidth / mScreenWidth) * 2.0f;
-        const float charHeight = (Font::CharHeight / mScreenHeight) * 2.0f;
         float currentX = ((ref.x / mScreenWidth) * 2.0f) - 1.0f;
         float currentY = 1.0f - ((ref.y / mScreenHeight) * 2.0f);
-        std::string_view text = std::string_view(mStrings.data() + ref.start, ref.length);
+        const std::string_view text = std::string_view(mStrings.data() + ref.start, ref.length);
 
         for (char c : text)
         {
