@@ -413,8 +413,6 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
                                                          nullptr,
                                                          IID_PPV_ARGS(&textureUploadHeap))));
 
-        // Copy data to the intermediate upload heap and then schedule a copy 
-        // from the upload heap to the Texture2D.
         std::vector<uint8_t> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
 
         D3D12_SUBRESOURCE_DATA textureData = {};
@@ -422,6 +420,7 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
         textureData.RowPitch = TextureWidth * TexturePixelSize;
         textureData.SlicePitch = textureData.RowPitch * TextureHeight;
 
+        // This is a helper function in d3dx12.h that copies data to a default heap (used by the texture) via the upload heap using CopyTextureRegion.
         UpdateSubresources(commandList, mTexture, textureUploadHeap, 0, 0, 1, &textureData);
         commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mTexture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
