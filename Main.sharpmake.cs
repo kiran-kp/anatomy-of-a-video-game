@@ -18,6 +18,12 @@ public class BirdGameProject : Project
 
         conf.IncludePaths.Add(@"[project.SharpmakeCsPath]\include");
 
+        // Check if a .use_warp_adapter file exists in the project directory and set a preprocessor definition if it does
+        if (System.IO.File.Exists(@".use_warp_adapter"))
+        {
+            conf.Defines.Add("USE_WARP_ADAPTER");
+        }
+
         conf.Options.Add(Options.Vc.General.CharacterSet.Unicode);
         conf.Options.Add(Options.Vc.General.WarningLevel.Level3);
         conf.Options.Add(Options.Vc.General.TreatWarningsAsErrors.Enable);
