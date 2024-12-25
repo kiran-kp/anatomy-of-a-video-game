@@ -1,5 +1,8 @@
 #include <Application.h>
 #include <Log.h>
+
+#include <thread>
+
 std::unique_ptr<Application> Application::mInstance;
 
 Application::Application()
@@ -14,6 +17,17 @@ Application::~Application()
 
 void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
 {
+    auto log_thread = std::thread([]() {
+        using namespace std::chrono_literals;
+        while (true)
+        {
+            LOGGER_FLUSH();
+            std::this_thread::sleep_for(10ms);
+        }
+    });
+
+    log_thread.detach();
+
     mInstance.reset(new Application());
     mInstance->mWindow.Initialize(L"Bird Game", 288, 512, hInstance, nCmdShow);
     LOG("Initialized Window");
@@ -37,7 +51,6 @@ void Application::Run()
 
 void Application::Update()
 {
-    LOGGER_FLUSH();
     mRenderer.AddDebugText("Hello World!", 100, 100);
 }
 
