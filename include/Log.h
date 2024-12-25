@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -28,6 +29,8 @@ public:
 private:
     Logger();
     FILE* mFile;
+    thread_local static std::array<LogMessage, 512> mMessagePool;
+    thread_local static size_t mMessagePoolIndex;
     std::atomic<LogMessage*> mHead;
     LogMessage* mTail;
 };
