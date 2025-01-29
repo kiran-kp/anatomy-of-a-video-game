@@ -1,5 +1,7 @@
 using Sharpmake;
 
+[module: Sharpmake.Include("extern/libpng.sharpmake.cs")]
+
 [Generate]
 public class BirdGameProject : Project
 {
@@ -39,6 +41,8 @@ public class BirdGameProject : Project
         conf.LibraryFiles.Add("dxgi");
         conf.LibraryFiles.Add("d3dcompiler");
         conf.LibraryFiles.Add("dxguid");
+
+        conf.AddPrivateDependency<LibPNG>(target);
     }
 }
 
