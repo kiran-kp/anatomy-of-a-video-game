@@ -704,10 +704,10 @@ void TextRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* c
 
     // Create root signature
     {
-        CD3DX12_DESCRIPTOR_RANGE ranges[1];
+        CD3DX12_DESCRIPTOR_RANGE ranges[1] {};
         ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
-        CD3DX12_ROOT_PARAMETER rootParameters[1];
+        CD3DX12_ROOT_PARAMETER rootParameters[1] {};
         rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
 
         D3D12_STATIC_SAMPLER_DESC sampler = {};
