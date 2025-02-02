@@ -918,10 +918,23 @@ public:
     TexturedQuadRenderer() = default;
     ~TexturedQuadRenderer() = default;
 
-    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef texture);
+    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
     void Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap);
 
+    void AddQuad(float x, float y, float width, float height, TextureRef texture);
+
 private:
+    constexpr static uint32_t MaxQuads = 64;
+
+    struct Quad
+    {
+        float x;
+        float y;
+        float width;
+        float height;
+        TextureRef texture;
+    };
+
     struct Vertex
     {
         DirectX::XMFLOAT3 position;
@@ -940,18 +953,16 @@ private:
     CD3DX12_VIEWPORT mViewport;
     CD3DX12_RECT mScissorRect;
 
-    TextureRef mTexture;
+    std::vector<Quad> mQuads;
 };
 
-void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef texture)
+void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight)
 {
     mScreenWidth = screenWidth;
     mScreenHeight = screenHeight;
 
     mViewport = CD3DX12_VIEWPORT(0.0f, 0.0f, screenWidth, screenHeight);
     mScissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(screenWidth), static_cast<LONG>(screenHeight));
-
-    mTexture = texture;
 
     // Create root signature
     {
@@ -1027,6 +1038,7 @@ void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsComman
     }
 
     {
+        /*
         Vertex vertices[] =
         {
             { { -1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f } },
@@ -1037,8 +1049,9 @@ void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsComman
             { {  1.0f,  1.0f, 0.0f }, { 1.0f, 0.0f } },
             { {  1.0f, -1.0f, 0.0f }, { 1.0f, 1.0f } }
         };
+        */
 
-        const uint32_t vertexBufferSize = sizeof(vertices);
+        const uint32_t vertexBufferSize = MaxQuads * 6 * sizeof(Vertex);
         ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
                                                          D3D12_HEAP_FLAG_NONE,
                                                          &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
@@ -1046,11 +1059,13 @@ void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsComman
                                                          nullptr,
                                                          IID_PPV_ARGS(&mVertexBuffer))));
 
+        /*
         UINT8* pVertexDataBegin;
         CD3DX12_RANGE readRange(0, 0);
         ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
         memcpy(pVertexDataBegin, vertices, sizeof(vertices));
         mVertexBuffer->Unmap(0, nullptr);
+        */
 
         mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
         mVertexBufferView.StrideInBytes = sizeof(Vertex);
@@ -1060,16 +1075,60 @@ void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsComman
 
 void TexturedQuadRenderer::Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap)
 {
+    UINT8* pVertexDataBegin;
+    CD3DX12_RANGE readRange(0, 0);
+    ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
+
+    for (const Quad& q : mQuads)
+    {
+        float x = ((q.x / mScreenWidth) * 2.0f) - 1.0f;
+        float y = 1.0f - ((q.y / mScreenHeight) * 2.0f);
+        float width = (q.width / mScreenWidth) * 2.0f;
+        float height = (q.height / mScreenHeight) * 2.0f;
+
+        float u1 = 0.0f;
+        float v1 = 0.0f;
+        float u2 = 1.0f;
+        float v2 = 1.0f;
+
+        Vertex* vertices = reinterpret_cast<Vertex*>(pVertexDataBegin);
+        vertices[0] = { { x, y, 0.0f }, { u1, v1 } };
+        vertices[1] = { { x + width, y, 0.0f }, { u2, v1 } };
+        vertices[2] = { { x, y - height, 0.0f }, { u1, v2 } };
+
+        vertices[3] = { { x, y - height, 0.0f }, { u1, v2 } };
+        vertices[4] = { { x + width, y, 0.0f }, { u2, v1 } };
+        vertices[5] = { { x + width, y - height, 0.0f }, { u2, v2 } };
+
+        pVertexDataBegin += 6 * sizeof(Vertex);
+    }
+
+    mVertexBuffer->Unmap(0, nullptr);
+
     commandList->SetGraphicsRootSignature(mRootSignature);
     commandList->SetPipelineState(mPipelineState);
-    commandList->SetGraphicsRootDescriptorTable(0, srvHeap.GetGPUHandle(mTexture.index));
     commandList->RSSetViewports(1, &mViewport);
     commandList->RSSetScissorRects(1, &mScissorRect);
 
     // This is the actual stuff we are drawing
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
-    commandList->DrawInstanced(6, 1, 0, 0);
+
+    UINT i = 0;
+    for (const Quad& q : mQuads)
+    {
+        commandList->SetGraphicsRootDescriptorTable(0, srvHeap.GetGPUHandle(q.texture.index));
+        commandList->DrawInstanced(6, 1, i * 6, 0);
+        i++;
+    }
+
+    mQuads.clear();
+}
+
+void TexturedQuadRenderer::AddQuad(float x, float y, float width, float height, TextureRef texture)
+{
+    ensure(mQuads.size() < MaxQuads);
+    mQuads.push_back({ x, y, width, height, texture });
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1096,6 +1155,7 @@ public:
     void WaitForPreviousFrame();
 
     void AddDebugText(std::string_view text, int32_t x, int32_t y);
+    void AddQuad(float x, float y, float width, float height, TextureRef texture);
 
 private:
     ID3D12Device* mDevice;
@@ -1298,14 +1358,16 @@ namespace
     }
 }
 
+TextureRef checkerboard;
+
 void RendererImpl::InitializeRenderers()
 {
     ensure(SUCCEEDED(mCommandList->Reset(mCommandAllocator, nullptr)));
 
     {
         const std::vector<uint8_t> textureData = GenerateTextureData(256, 256, 4);
-        TextureRef checkerboard = CreateTexture(256, 256, 4, textureData.data());
-        mQuadRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight), checkerboard);
+        checkerboard = CreateTexture(256, 256, 4, textureData.data());
+        mQuadRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
     }
 
     {
@@ -1338,9 +1400,28 @@ void RendererImpl::PopulateCommandListAndSubmit()
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-    // Have to set the descriptor heap before setting the root signature
     ID3D12DescriptorHeap* heaps[] = { mSrvHeap.Get() };
     mCommandList->SetDescriptorHeaps(1, heaps);
+
+    static float x = 0.0f;
+    static float y = 0.0f;
+    static float xDir = 1.0f;
+    static float yDir = 1.0f;
+
+    AddQuad(x, y, 100.0f, 100.0f, checkerboard);
+
+    x += 1.0f * xDir;
+    y += 1.0f * yDir;
+    if ((x + 100.0) > mWidth || x < 0.0f)
+    {
+        xDir *= -1.0f;
+    }
+
+    if ((y + 100.0f) > mHeight || y < 0.0f)
+    {
+        yDir *= -1.0f;
+    }
+
 
     mQuadRenderer.Render(mCommandList, mSrvHeap);
     mTextRenderer.Render(mCommandList, mSrvHeap);
@@ -1384,6 +1465,11 @@ void RendererImpl::AddDebugText(std::string_view text, int32_t x, int32_t y)
     mTextRenderer.AddDebugText(text, x, y);
 }
 
+void RendererImpl::AddQuad(float x, float y, float width, float height, TextureRef texture)
+{
+    mQuadRenderer.AddQuad(x, y, width, height, texture);
+}
+
 // ------------------------------------------------------------------------------------------------
 
 Renderer::Renderer() = default;
@@ -1424,5 +1510,10 @@ void Renderer::AddDebugText(std::string_view text, int32_t x, int32_t y)
 
 TextureRef Renderer::CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data)
 {
-    return TextureRef { mImpl->CreateTexture(width, height, pixelSize, data) };
+    return mImpl->CreateTexture(width, height, pixelSize, data);
+}
+
+void Renderer::AddQuad(float x, float y, float width, float height, TextureRef texture)
+{
+    mImpl->AddQuad(x, y, width, height, texture);
 }
