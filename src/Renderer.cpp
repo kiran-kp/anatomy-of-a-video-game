@@ -1091,6 +1091,9 @@ void TexturedQuadRenderer::Render(ID3D12GraphicsCommandList* commandList, Descri
 
     for (const Quad& q : mQuads)
     {
+        // Convert screen coordinates to NDC
+        // NDC_x = (2 * pixel_x / screen_width) - 1
+        // NDC_y = 1 - (2 * pixel_y / screen_height)
         float x = ((q.x / mScreenWidth) * 2.0f) - 1.0f;
         float y = 1.0f - ((q.y / mScreenHeight) * 2.0f);
         float width = (q.width / mScreenWidth) * 2.0f;
