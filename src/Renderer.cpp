@@ -13,9 +13,142 @@
 #include <dxgi1_4.h>
 
 #include <array>
+#include <vector>
 
 // Using a #define here because this is used to set uint32_t or size_t in different contexts and I didn't want cast it every time.
 #define NUM_BACKBUFFERS 2
+
+constexpr size_t NumSRVs = 32;
+
+class Texture
+{
+public:
+    Texture() = default;
+    ~Texture() = default;
+
+    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, uint32_t width, uint32_t height, uint32_t pixelSize, const void* data);
+    void Destroy();
+
+    ID3D12Resource* Get() const
+    {
+        return mTexture;
+    }
+
+private:
+    ID3D12Resource* mTexture = nullptr;
+};
+
+void Texture::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, uint32_t width, uint32_t height, uint32_t pixelSize, const void* data)
+{
+    D3D12_RESOURCE_DESC textureDesc = {};
+    textureDesc.MipLevels = 1;
+    textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    textureDesc.DepthOrArraySize = 1;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.SampleDesc.Quality = 0;
+    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+
+    ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+                                                     D3D12_HEAP_FLAG_NONE,
+                                                     &textureDesc,
+                                                     D3D12_RESOURCE_STATE_COPY_DEST,
+                                                     nullptr,
+                                                     IID_PPV_ARGS(&mTexture))));
+
+    const UINT64 uploadBufferSize = GetRequiredIntermediateSize(mTexture, 0, 1);
+
+    // Create the GPU upload buffer.
+    ID3D12Resource* textureUploadHeap;
+    ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+                                                     D3D12_HEAP_FLAG_NONE,
+                                                     &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
+                                                     D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                     nullptr,
+                                                     IID_PPV_ARGS(&textureUploadHeap))));
+
+    D3D12_SUBRESOURCE_DATA textureData = {};
+    textureData.pData = data;
+    textureData.RowPitch = width * pixelSize;
+    textureData.SlicePitch = textureData.RowPitch * height;
+
+    // This is a helper function in d3dx12.h that copies data to a default heap (used by the texture) via the upload heap using CopyTextureRegion.
+    UpdateSubresources(commandList, mTexture, textureUploadHeap, 0, 0, 1, &textureData);
+    commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mTexture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+}
+
+void Texture::Destroy()
+{
+    mTexture->Release();
+}
+
+class DescriptorHeap
+{
+public:
+    DescriptorHeap() = default;
+    ~DescriptorHeap() = default;
+
+    void Initialize(ID3D12Device* device, uint32_t numDescriptors);
+
+    ID3D12DescriptorHeap* Get() const
+    {
+        return mDescriptorHeap;
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(size_t index) const;
+    D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(size_t index) const;
+
+    void CreateSRV(ID3D12Device* device, Texture& texture, size_t index);
+private:
+    ID3D12DescriptorHeap* mDescriptorHeap = nullptr;
+    D3D12_CPU_DESCRIPTOR_HANDLE mCPUHandle;
+    D3D12_GPU_DESCRIPTOR_HANDLE mGPUHandle;
+    uint32_t mIncrement = 0;
+};
+
+void DescriptorHeap::Initialize(ID3D12Device* device, uint32_t numDescriptors)
+{
+    D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+    srvHeapDesc.NumDescriptors = numDescriptors;
+    srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    ensure(SUCCEEDED(device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mDescriptorHeap))));
+
+    mIncrement = device->GetDescriptorHandleIncrementSize(srvHeapDesc.Type);
+
+    mCPUHandle = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    mGPUHandle = mDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DescriptorHeap::GetCPUHandle(size_t index) const
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE handle;
+    handle.ptr = mCPUHandle.ptr + static_cast<UINT64>(index) * static_cast<UINT64>(mIncrement);
+    return handle;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GetGPUHandle(size_t index) const
+{
+    D3D12_GPU_DESCRIPTOR_HANDLE handle;
+    handle.ptr = mGPUHandle.ptr + static_cast<UINT64>(index) * static_cast<UINT64>(mIncrement);
+    return handle;
+}
+
+void DescriptorHeap::CreateSRV(ID3D12Device* device, Texture& texture, size_t index)
+{
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE handle = GetCPUHandle(index);
+    device->CreateShaderResourceView(texture.Get(), &srvDesc, handle);
+}
+
+// ------------------------------------------------------------------------------------------------
 
 class TriangleRenderer
 {
@@ -183,8 +316,8 @@ public:
     TexturedTriangleRenderer() = default;
     ~TexturedTriangleRenderer();
 
-    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float width, float height);
-    void Render(ID3D12GraphicsCommandList* commandList);
+    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float width, float height, TextureRef texture);
+    void Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap);
 
 private:
     static constexpr uint32_t TextureWidth = 256;
@@ -205,8 +338,7 @@ private:
     ID3D12Resource* mVertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW mVertexBufferView;
 
-    ID3D12DescriptorHeap* mSrvHeap;
-    ID3D12Resource* mTexture;
+	TextureRef mTexture;
 };
 
 TexturedTriangleRenderer::~TexturedTriangleRenderer()
@@ -214,46 +346,9 @@ TexturedTriangleRenderer::~TexturedTriangleRenderer()
     mRootSignature->Release();
     mPipelineState->Release();
     mVertexBuffer->Release();
-    mTexture->Release();
 }
 
-std::vector<uint8_t> GenerateTextureData(const uint32_t textureWidth, const uint32_t textureHeight, const uint32_t texturePixelSize)
-{
-    const uint32_t rowPitch = textureWidth * texturePixelSize;
-    const uint32_t cellPitch = rowPitch >> 3;
-    const uint32_t cellHeight = textureWidth >> 3;
-    const uint32_t textureSize = rowPitch * textureHeight;
-
-    std::vector<uint8_t> data(textureSize);
-    uint8_t* pData = &data[0];
-
-    for (uint32_t n = 0; n < textureSize; n += texturePixelSize)
-    {
-        uint32_t x = n % rowPitch;
-        uint32_t y = n / rowPitch;
-        uint32_t i = x / cellPitch;
-        uint32_t j = y / cellHeight;
-
-        if (i % 2 == j % 2)
-        {
-            pData[n] = 0x00;        // R
-            pData[n + 1] = 0x00;    // G
-            pData[n + 2] = 0x00;    // B
-            pData[n + 3] = 0xff;    // A
-        }
-        else
-        {
-            pData[n] = 0xff;        // R
-            pData[n + 1] = 0xff;    // G
-            pData[n + 2] = 0xff;    // B
-            pData[n + 3] = 0xff;    // A
-        }
-    }
-
-    return data;
-}
-
-void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float width, float height)
+void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float width, float height, TextureRef texture)
 {
     float aspectRatio = width / height;
     mViewport.TopLeftX = 0.0f;
@@ -268,12 +363,7 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
     mScissorRect.right= static_cast<uint64_t>(width);
     mScissorRect.bottom = static_cast<uint64_t>(height);
 
-    // Describe and create a shader resource view (SRV) heap for the texture.
-    D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-    srvHeapDesc.NumDescriptors = 1;
-    srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    ensure(SUCCEEDED(device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvHeap))));
+	mTexture = texture;
 
     // Create root signature
     {
@@ -382,67 +472,13 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
         mVertexBufferView.StrideInBytes = sizeof(Vertex);
         mVertexBufferView.SizeInBytes = vertexBufferSize;
     }
-
-    {
-        // Describe and create a Texture2D.
-        D3D12_RESOURCE_DESC textureDesc = {};
-        textureDesc.MipLevels = 1;
-        textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        textureDesc.Width = TextureWidth;
-        textureDesc.Height = TextureHeight;
-        textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        textureDesc.DepthOrArraySize = 1;
-        textureDesc.SampleDesc.Count = 1;
-        textureDesc.SampleDesc.Quality = 0;
-        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-                                                         D3D12_HEAP_FLAG_NONE,
-                                                         &textureDesc,
-                                                         D3D12_RESOURCE_STATE_COPY_DEST,
-                                                         nullptr,
-                                                         IID_PPV_ARGS(&mTexture))));
-
-        const UINT64 uploadBufferSize = GetRequiredIntermediateSize(mTexture, 0, 1);
-
-        // Create the GPU upload buffer.
-        ID3D12Resource* textureUploadHeap;
-        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-                                                         D3D12_HEAP_FLAG_NONE,
-                                                         &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
-                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                         nullptr,
-                                                         IID_PPV_ARGS(&textureUploadHeap))));
-
-        std::vector<uint8_t> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
-
-        D3D12_SUBRESOURCE_DATA textureData = {};
-        textureData.pData = &texture[0];
-        textureData.RowPitch = TextureWidth * TexturePixelSize;
-        textureData.SlicePitch = textureData.RowPitch * TextureHeight;
-
-        // This is a helper function in d3dx12.h that copies data to a default heap (used by the texture) via the upload heap using CopyTextureRegion.
-        UpdateSubresources(commandList, mTexture, textureUploadHeap, 0, 0, 1, &textureData);
-        commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mTexture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-
-        // Describe and create a SRV for the texture.
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Format = textureDesc.Format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(mTexture, &srvDesc, mSrvHeap->GetCPUDescriptorHandleForHeapStart());
-    }
 }
 
-void TexturedTriangleRenderer::Render(ID3D12GraphicsCommandList* commandList)
+void TexturedTriangleRenderer::Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap)
 {
-    // Have to set the descriptor heap before setting the root signature
-    ID3D12DescriptorHeap* heaps[] = { mSrvHeap };
-    commandList->SetDescriptorHeaps(1, heaps);
-
     commandList->SetGraphicsRootSignature(mRootSignature);
     commandList->SetPipelineState(mPipelineState);
-    commandList->SetGraphicsRootDescriptorTable(0, mSrvHeap->GetGPUDescriptorHandleForHeapStart());
+    commandList->SetGraphicsRootDescriptorTable(0, srvHeap.GetGPUHandle(mTexture.index));
     commandList->RSSetViewports(1, &mViewport);
     commandList->RSSetScissorRects(1, &mScissorRect);
 
@@ -460,8 +496,8 @@ public:
     TextRenderer() = default;
     ~TextRenderer();
 
-    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
-    void Render(ID3D12GraphicsCommandList* commandList);
+    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef font);
+    void Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap);
     void AddDebugText(std::string_view text, int32_t x, int32_t y);
 
 private:
@@ -481,8 +517,7 @@ private:
     ID3D12Resource* mVertexBuffer = nullptr;
     D3D12_VERTEX_BUFFER_VIEW mVertexBufferView = {};
 
-    ID3D12DescriptorHeap* mSrvHeap = nullptr;
-    ID3D12Resource* mFontTexture = nullptr;
+    TextureRef mFontTexture;
 
     float mScreenWidth = 0;
     float mScreenHeight = 0;
@@ -504,8 +539,6 @@ TextRenderer::~TextRenderer()
     mRootSignature->Release();
     mPipelineState->Release();
     mVertexBuffer->Release();
-    mSrvHeap->Release();
-    mFontTexture->Release();
 }
 
 namespace Font
@@ -687,7 +720,7 @@ namespace Font
     }
 }
 
-void TextRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight)
+void TextRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef font)
 {
     mScreenWidth = screenWidth;
     mScreenHeight = screenHeight;
@@ -695,12 +728,7 @@ void TextRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* c
     mViewport = CD3DX12_VIEWPORT(0.0f, 0.0f, screenWidth, screenHeight);
     mScissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(screenWidth), static_cast<LONG>(screenHeight));
 
-    // Create descriptor heap for font texture
-    D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-    srvHeapDesc.NumDescriptors = 1;
-    srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    ensure(SUCCEEDED(device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvHeap))));
+    mFontTexture = font;
 
     // Create root signature
     {
@@ -800,55 +828,6 @@ void TextRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* c
         mVertexBufferView.StrideInBytes = sizeof(Vertex);
         mVertexBufferView.SizeInBytes = vertexBufferSize;
     }
-
-    // Create font texture
-    {
-        D3D12_RESOURCE_DESC textureDesc = {};
-        textureDesc.MipLevels = 1;
-        textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        textureDesc.Width = Font::TextureWidth;
-        textureDesc.Height = Font::TextureHeight;
-        textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        textureDesc.DepthOrArraySize = 1;
-        textureDesc.SampleDesc.Count = 1;
-        textureDesc.SampleDesc.Quality = 0;
-        textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-
-        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-                                                         D3D12_HEAP_FLAG_NONE,
-                                                         &textureDesc,
-                                                         D3D12_RESOURCE_STATE_COPY_DEST,
-                                                         nullptr,
-                                                         IID_PPV_ARGS(&mFontTexture))));
-
-        const UINT64 uploadBufferSize = GetRequiredIntermediateSize(mFontTexture, 0, 1);
-        ID3D12Resource* textureUploadHeap;
-        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-                                                         D3D12_HEAP_FLAG_NONE,
-                                                         &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
-                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                         nullptr,
-                                                         IID_PPV_ARGS(&textureUploadHeap))));
-
-        std::vector<uint8_t> textureData = Font::GenerateTextureData();
-        D3D12_SUBRESOURCE_DATA textureSubresourceData = {};
-        textureSubresourceData.pData = textureData.data();
-        textureSubresourceData.RowPitch = Font::TextureWidth * Font::TexturePixelSize;
-        textureSubresourceData.SlicePitch = textureSubresourceData.RowPitch * Font::TextureHeight;
-
-        UpdateSubresources(commandList, mFontTexture, textureUploadHeap, 0, 0, 1, &textureSubresourceData);
-        commandList->ResourceBarrier(1,
-                                     &CD3DX12_RESOURCE_BARRIER::Transition(mFontTexture, 
-                                                                           D3D12_RESOURCE_STATE_COPY_DEST,
-                                                                           D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Format = textureDesc.Format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(mFontTexture, &srvDesc, mSrvHeap->GetCPUDescriptorHandleForHeapStart());
-    }
 }
 
 namespace Font
@@ -866,7 +845,7 @@ namespace Font
     }
 }
 
-void TextRenderer::Render(ID3D12GraphicsCommandList* commandList)
+void TextRenderer::Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap)
 {
     // Map vertex buffer
     Vertex* vertices;
@@ -909,12 +888,9 @@ void TextRenderer::Render(ID3D12GraphicsCommandList* commandList)
 
     mVertexBuffer->Unmap(0, nullptr);
 
-    ID3D12DescriptorHeap* heaps[] = { mSrvHeap };
-    commandList->SetDescriptorHeaps(1, heaps);
-
     commandList->SetGraphicsRootSignature(mRootSignature);
     commandList->SetPipelineState(mPipelineState);
-    commandList->SetGraphicsRootDescriptorTable(0, mSrvHeap->GetGPUDescriptorHandleForHeapStart());
+    commandList->SetGraphicsRootDescriptorTable(0, srvHeap.GetGPUHandle(mFontTexture.index));
 
     commandList->RSSetViewports(1, &mViewport);
     commandList->RSSetScissorRects(1, &mScissorRect);
@@ -944,9 +920,12 @@ public:
     void CreateCommandQueue();
     void CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height);
     void CreateCommandList();
+    void CreateDescriptorHeaps();
     void CreateFence();
 
-    void InitializeTriangleRenderer();
+    TextureRef CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data);
+
+    void InitializeRenderers();
 
     void PopulateCommandListAndSubmit();
     void Present();
@@ -966,8 +945,11 @@ private:
     ID3D12DescriptorHeap* mRtvHeap;
     uint32_t mRtvDescriptorSize;
 
-    ID3D12Resource* mRenderTargets[NUM_BACKBUFFERS];
+    std::array<ID3D12Resource*, NUM_BACKBUFFERS> mRenderTargets;
     ID3D12GraphicsCommandList* mCommandList;
+
+    DescriptorHeap mSrvHeap;
+    std::vector<Texture> mTextures;
 
     TexturedTriangleRenderer mTriangleRenderer;
     TextRenderer mTextRenderer;
@@ -1082,6 +1064,11 @@ void RendererImpl::CreateCommandList()
     mCommandList->Close();
 }
 
+void RendererImpl::CreateDescriptorHeaps()
+{
+    mSrvHeap.Initialize(mDevice, static_cast<uint32_t>(NumSRVs));
+}
+
 // A fence is a synchronization primitive that we can use to signal that the GPU is done rendering a frame
 void RendererImpl::CreateFence()
 {
@@ -1096,12 +1083,72 @@ void RendererImpl::CreateFence()
     }
 }
 
-void RendererImpl::InitializeTriangleRenderer()
+TextureRef RendererImpl::CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data)
+{
+    Texture texture;
+    texture.Initialize(mDevice, mCommandList, width, height, pixelSize, data);
+    size_t index = mTextures.size();
+    assert(index < NumSRVs);
+    mTextures.push_back(std::move(texture));
+
+    mSrvHeap.CreateSRV(mDevice, texture, index);
+    return { index };
+}
+
+namespace
+{
+    std::vector<uint8_t> GenerateTextureData(const uint32_t textureWidth, const uint32_t textureHeight, const uint32_t texturePixelSize)
+    {
+        const uint32_t rowPitch = textureWidth * texturePixelSize;
+        const uint32_t cellPitch = rowPitch >> 3;
+        const uint32_t cellHeight = textureWidth >> 3;
+        const uint32_t textureSize = rowPitch * textureHeight;
+
+        std::vector<uint8_t> data(textureSize);
+        uint8_t* pData = &data[0];
+
+        for (uint32_t n = 0; n < textureSize; n += texturePixelSize)
+        {
+            uint32_t x = n % rowPitch;
+            uint32_t y = n / rowPitch;
+            uint32_t i = x / cellPitch;
+            uint32_t j = y / cellHeight;
+
+            if (i % 2 == j % 2)
+            {
+                pData[n] = 0x00;        // R
+                pData[n + 1] = 0x00;    // G
+                pData[n + 2] = 0x00;    // B
+                pData[n + 3] = 0xff;    // A
+            }
+            else
+            {
+                pData[n] = 0xff;        // R
+                pData[n + 1] = 0xff;    // G
+                pData[n + 2] = 0xff;    // B
+                pData[n + 3] = 0xff;    // A
+            }
+        }
+
+        return data;
+    }
+}
+
+void RendererImpl::InitializeRenderers()
 {
     ensure(SUCCEEDED(mCommandList->Reset(mCommandAllocator, nullptr)));
- 
-    mTriangleRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
-    mTextRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
+
+    {
+        const std::vector<uint8_t> textureData = GenerateTextureData(256, 256, 4);
+        TextureRef checkerboard = CreateTexture(256, 256, 4, textureData.data());
+        mTriangleRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight), checkerboard);
+    }
+
+    {
+        std::vector<uint8_t> textureData = Font::GenerateTextureData();
+        TextureRef font{ CreateTexture(Font::TextureWidth, Font::TextureHeight, Font::TexturePixelSize, textureData.data()) };
+        mTextRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight), font);
+    }
 
     // Close the command list and execute it to begin the initial GPU setup.
     ensure(SUCCEEDED(mCommandList->Close()));
@@ -1127,8 +1174,13 @@ void RendererImpl::PopulateCommandListAndSubmit()
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-    mTriangleRenderer.Render(mCommandList);
-    mTextRenderer.Render(mCommandList);
+    // Have to set the descriptor heap before setting the root signature
+    ID3D12DescriptorHeap* heaps[] = { mSrvHeap.Get() };
+    mCommandList->SetDescriptorHeaps(1, heaps);
+
+    mTriangleRenderer.Render(mCommandList, mSrvHeap);
+    mTextRenderer.Render(mCommandList, mSrvHeap);
+
     // Transition back buffer back to the present state since we are done drawing to it and want it ready for present
     mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
@@ -1181,9 +1233,10 @@ void Renderer::Initialize(Window& window)
     mImpl->CreateCommandQueue();
     mImpl->CreateSwapChain(window.GetHandle(), window.GetWidth(), window.GetHeight());
     mImpl->CreateCommandList();
+	mImpl->CreateDescriptorHeaps();
     mImpl->CreateFence();
 
-    mImpl->InitializeTriangleRenderer();
+    mImpl->InitializeRenderers();
 
     // Wait for all the setup work we just did to complete because we are going to re-use the command list
     mImpl->WaitForPreviousFrame();
@@ -1203,4 +1256,9 @@ void Renderer::Render()
 void Renderer::AddDebugText(std::string_view text, int32_t x, int32_t y)
 {
     mImpl->AddDebugText(text, x, y);
+}
+
+TextureRef Renderer::CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data)
+{
+    return TextureRef { mImpl->CreateTexture(width, height, pixelSize, data) };
 }
