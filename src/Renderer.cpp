@@ -1233,7 +1233,7 @@ void Renderer::Initialize(Window& window)
     mImpl->CreateCommandQueue();
     mImpl->CreateSwapChain(window.GetHandle(), window.GetWidth(), window.GetHeight());
     mImpl->CreateCommandList();
-	mImpl->CreateDescriptorHeaps();
+    mImpl->CreateDescriptorHeaps();
     mImpl->CreateFence();
 
     mImpl->InitializeRenderers();
