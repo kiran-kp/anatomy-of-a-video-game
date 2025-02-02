@@ -136,7 +136,9 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
         bird3 = mInstance->mRenderer.CreateTexture(34, 24, 4, data.data());
     }
 
+    LOG("Initialized Textures");
     mInstance->mRenderer.FinishUploadingTextures();
+    LOG("Uploaded textures to GPU");
 }
 
 Application& Application::Instance()
