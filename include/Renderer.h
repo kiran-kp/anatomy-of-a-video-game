@@ -18,6 +18,7 @@ public:
     ~Renderer();
 
     void Initialize(Window& window);
+    void FinishUploadingTextures();
     void Shutdown();
 
     void Render();

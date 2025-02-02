@@ -1034,6 +1034,16 @@ void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsComman
         psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
         psoDesc.SampleDesc.Count = 1;
 
+        // Enable alpha blending
+        psoDesc.BlendState.RenderTarget[0].BlendEnable = TRUE;
+        psoDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        psoDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        psoDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        psoDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+        psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+        psoDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+        psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
         ensure(SUCCEEDED(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPipelineState))));
     }
 
@@ -1149,6 +1159,7 @@ public:
     TextureRef CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data);
 
     void InitializeRenderers();
+	void FinishUploadingTextures();
 
     void PopulateCommandListAndSubmit();
     void Present();
@@ -1375,11 +1386,17 @@ void RendererImpl::InitializeRenderers()
         TextureRef font{ CreateTexture(Font::TextureWidth, Font::TextureHeight, Font::TexturePixelSize, textureData.data()) };
         mTextRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight), font);
     }
+}
 
+void RendererImpl::FinishUploadingTextures()
+{
     // Close the command list and execute it to begin the initial GPU setup.
     ensure(SUCCEEDED(mCommandList->Close()));
     ID3D12CommandList* commandLists[] = { mCommandList };
     mCommandQueue->ExecuteCommandLists(1, commandLists);
+
+    // Wait for all the setup work we just did to complete because we are going to re-use the command list
+    WaitForPreviousFrame();
 }
 
 void RendererImpl::PopulateCommandListAndSubmit()
@@ -1402,26 +1419,6 @@ void RendererImpl::PopulateCommandListAndSubmit()
 
     ID3D12DescriptorHeap* heaps[] = { mSrvHeap.Get() };
     mCommandList->SetDescriptorHeaps(1, heaps);
-
-    static float x = 0.0f;
-    static float y = 0.0f;
-    static float xDir = 1.0f;
-    static float yDir = 1.0f;
-
-    AddQuad(x, y, 100.0f, 100.0f, checkerboard);
-
-    x += 1.0f * xDir;
-    y += 1.0f * yDir;
-    if ((x + 100.0) > mWidth || x < 0.0f)
-    {
-        xDir *= -1.0f;
-    }
-
-    if ((y + 100.0f) > mHeight || y < 0.0f)
-    {
-        yDir *= -1.0f;
-    }
-
 
     mQuadRenderer.Render(mCommandList, mSrvHeap);
     mTextRenderer.Render(mCommandList, mSrvHeap);
@@ -1487,9 +1484,11 @@ void Renderer::Initialize(Window& window)
     mImpl->CreateFence();
 
     mImpl->InitializeRenderers();
+}
 
-    // Wait for all the setup work we just did to complete because we are going to re-use the command list
-    mImpl->WaitForPreviousFrame();
+void Renderer::FinishUploadingTextures()
+{
+	mImpl->FinishUploadingTextures();
 }
 
 void Renderer::Shutdown()
