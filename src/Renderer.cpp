@@ -1372,15 +1372,12 @@ namespace
     }
 }
 
-TextureRef checkerboard;
-
 void RendererImpl::InitializeRenderers()
 {
     ensure(SUCCEEDED(mCommandList->Reset(mCommandAllocator, nullptr)));
 
     {
         const std::vector<uint8_t> textureData = GenerateTextureData(256, 256, 4);
-        checkerboard = CreateTexture(256, 256, 4, textureData.data());
         mQuadRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
     }
 
