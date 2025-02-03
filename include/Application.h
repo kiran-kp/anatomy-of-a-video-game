@@ -32,5 +32,7 @@ private:
     Window mWindow;
     Renderer mRenderer;
 
+    TextureRef mBackground;
+
     static std::unique_ptr<Application> mInstance;
 };

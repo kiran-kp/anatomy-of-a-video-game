@@ -1,5 +1,6 @@
 #include <Application.h>
 #include <Log.h>
+#include <Util.h>
 
 #include <png.h>
 
@@ -10,9 +11,36 @@
 
 std::unique_ptr<Application> Application::mInstance;
 
+class Sprite
+{
+public:
+    Sprite(float width, float height, float frameTime = 0.0f)
+        : mWidth(width)
+        , mHeight(height)
+		, mFrameTime(frameTime)
+    {
+    }
+
+	void AddTexture(TextureRef texture)
+	{
+		mTextures.push_back(texture);
+	}
+
+    void Render(Renderer& renderer)
+    {
+    };
+private:
+	float mWidth;
+	float mHeight;
+    size_t mFrame;
+    float mFrameTime;
+	std::vector<TextureRef> mTextures;
+};
+
 Application::Application()
     : mWindow()
     , mRenderer()
+	, mBackground()
 {
 }
 
@@ -20,6 +48,7 @@ Application::~Application()
 {
 }
 
+// Useful debugging tool: https://www.nayuki.io/page/png-file-chunk-inspector
 std::vector<uint8_t> ReadPNG(std::string_view path)
 {
     FILE* file = nullptr;
@@ -82,15 +111,27 @@ std::vector<uint8_t> ReadPNG(std::string_view path)
         {
 			png_bytep row = pngData[y];
 			png_byte pixelGroup = row[x / pixelsPerByte];
-            assert(bit_depth == 4);
-            png_byte pixel = (pixelGroup >> (4 - (x % 2) * 4)) & 0xF;
+            png_byte pixel = 0;
+            if (bit_depth == 4)
+            {
+                pixel = (pixelGroup >> (4 - (x % 2) * 4)) & 0xF;
+            }
+            else if (bit_depth == 8)
+            {
+                pixel = row[x];
+			}
+			else
+			{
+				ensure(false);
+			}
+
 
             png_color color = palette[pixel];
             size_t base = (y * width + x) * 4;
             textureData[base + 0] = color.red;
             textureData[base + 1] = color.green;
             textureData[base + 2] = color.blue;
-            textureData[base + 3] = transAlpha[pixel];
+            textureData[base + 3] = transAlpha ? transAlpha[pixel] : 0xFF;
         }
     }
 
@@ -135,6 +176,10 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
         auto data = ReadPNG("assets/sprites/bluebird-upflap.png");
         bird3 = mInstance->mRenderer.CreateTexture(34, 24, 4, data.data());
     }
+    {
+        auto data = ReadPNG("assets/sprites/background-night.png");
+        mInstance->mBackground = mInstance->mRenderer.CreateTexture(288, 512, 4, data.data());
+    }
 
     LOG("Initialized Textures");
     mInstance->mRenderer.FinishUploadingTextures();
@@ -162,10 +207,13 @@ void Application::Update()
 
 void Application::Render()
 {
-	TextureRef bird[] = { bird1, bird2, bird3 };
+    mRenderer.AddQuad(0.0f, 0.0f, 288.0f, 512.0f, mBackground);
+
+    TextureRef bird[] = { bird1, bird2, bird3 };
     static size_t frame = 0;
 	mRenderer.AddQuad(50.0f, 50.0f, 34.0f, 24.0f, bird[frame]);
 	frame = (frame + 1) % 3;
+
     mRenderer.Render();
 }
 
