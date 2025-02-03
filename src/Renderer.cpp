@@ -51,23 +51,30 @@ void Texture::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* comman
     textureDesc.SampleDesc.Quality = 0;
     textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
-    ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-                                                     D3D12_HEAP_FLAG_NONE,
-                                                     &textureDesc,
-                                                     D3D12_RESOURCE_STATE_COPY_DEST,
-                                                     nullptr,
-                                                     IID_PPV_ARGS(&mTexture))));
+    {
+        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
+        ensure(SUCCEEDED(device->CreateCommittedResource(&heapProperties,
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &textureDesc,
+                                                         D3D12_RESOURCE_STATE_COPY_DEST,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&mTexture))));
+    }
 
     const UINT64 uploadBufferSize = GetRequiredIntermediateSize(mTexture, 0, 1);
 
     // Create the GPU upload buffer.
     ID3D12Resource* textureUploadHeap;
-    ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-                                                     D3D12_HEAP_FLAG_NONE,
-                                                     &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
-                                                     D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                     nullptr,
-                                                     IID_PPV_ARGS(&textureUploadHeap))));
+    {
+        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+        ensure(SUCCEEDED(device->CreateCommittedResource(&heapProperties,
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &bufferDesc,
+                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&textureUploadHeap))));
+    }
 
     D3D12_SUBRESOURCE_DATA textureData = {};
     textureData.pData = data;
@@ -76,7 +83,8 @@ void Texture::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* comman
 
     // This is a helper function in d3dx12.h that copies data to a default heap (used by the texture) via the upload heap using CopyTextureRegion.
     UpdateSubresources(commandList, mTexture, textureUploadHeap, 0, 0, 1, &textureData);
-    commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mTexture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(mTexture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    commandList->ResourceBarrier(1, &barrier);
 }
 
 void Texture::Destroy()
@@ -275,9 +283,11 @@ void TriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandLis
         // recommended. Every time the GPU needs it, the upload heap will be marshalled 
         // over. Please read up on Default Heap usage. An upload heap is used here for 
         // code simplicity and because there are very few verts to actually transfer.
-        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
+        ensure(SUCCEEDED(device->CreateCommittedResource(&heapProperties,
                                                          D3D12_HEAP_FLAG_NONE,
-                                                         &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
+                                                         &bufferDesc,
                                                          D3D12_RESOURCE_STATE_GENERIC_READ,
                                                          nullptr,
                                                          IID_PPV_ARGS(&mVertexBuffer))));
@@ -454,9 +464,11 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
         const uint32_t vertexBufferSize = sizeof(triangleVertices);
 
         // Just using an upload heap directly for this since performance doesn't matter
-        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
+        ensure(SUCCEEDED(device->CreateCommittedResource(&heapProperties,
                                                          D3D12_HEAP_FLAG_NONE,
-                                                         &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
+                                                         &bufferDesc,
                                                          D3D12_RESOURCE_STATE_GENERIC_READ,
                                                          nullptr,
                                                          IID_PPV_ARGS(&mVertexBuffer))));
@@ -818,13 +830,14 @@ void TextRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* c
     // Create vertex buffer
     {
         const uint32_t vertexBufferSize = MaxCharacters * 6 * sizeof(Vertex); // 6 vertices per quad
-        ensure(SUCCEEDED(device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&mVertexBuffer))));
+        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
+        ensure(SUCCEEDED(device->CreateCommittedResource(&heapProperties,
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &bufferDesc,
+                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&mVertexBuffer))));
 
         mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
         mVertexBufferView.StrideInBytes = sizeof(Vertex);
@@ -1049,9 +1062,11 @@ void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsComman
 
     {
         const uint32_t vertexBufferSize = MaxQuads * 6 * sizeof(Vertex);
-        ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
+        ensure(SUCCEEDED(device->CreateCommittedResource(&heapProperties,
                                                          D3D12_HEAP_FLAG_NONE,
-                                                         &CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
+                                                         &bufferDesc,
                                                          D3D12_RESOURCE_STATE_GENERIC_READ,
                                                          nullptr,
                                                          IID_PPV_ARGS(&mVertexBuffer))));
@@ -1387,7 +1402,10 @@ void RendererImpl::PopulateCommandListAndSubmit()
     ensure(SUCCEEDED(mCommandList->Reset(mCommandAllocator, nullptr)));
 
     // Transition our back buffer to be able to be used as a render target since we're rendering to it
-    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    {
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        mCommandList->ResourceBarrier(1, &barrier);
+    }
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(mRtvHeap->GetCPUDescriptorHandleForHeapStart(), mFrameIndex, mRtvDescriptorSize);
     mCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
@@ -1402,7 +1420,10 @@ void RendererImpl::PopulateCommandListAndSubmit()
     mTextRenderer.Render(mCommandList, mSrvHeap);
 
     // Transition back buffer back to the present state since we are done drawing to it and want it ready for present
-    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    {
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(mRenderTargets[mFrameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+        mCommandList->ResourceBarrier(1, &barrier);
+    }
 
     ensure(SUCCEEDED(mCommandList->Close()));
 

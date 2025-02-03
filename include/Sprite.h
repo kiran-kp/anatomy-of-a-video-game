@@ -10,7 +10,9 @@ public:
 
     void Initialize(float width, float height, float frameTime = 0.0f);
     void AddTexture(TextureRef texture);
-    void Render(Renderer& renderer, float deltaTime, float x, float y);
+
+    void Update(float deltaTime);
+    void Render(Renderer& renderer, float x, float y);
 
     float GetWidth() const { return mWidth; }
     float GetHeight() const { return mHeight; }

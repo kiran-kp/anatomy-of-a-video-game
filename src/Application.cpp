@@ -5,6 +5,7 @@
 #include <png.h>
 
 #include <cassert>
+#include <format>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -155,13 +156,15 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     for (auto& [sprite, image] : images)
     {
         auto data = ReadPNG(image.path);
-        sprite->Initialize(image.width, image.height, 0.1f);
+        sprite->Initialize(image.width, image.height, 160.0f);
         sprite->AddTexture(mInstance->mRenderer.CreateTexture(static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height), 4, data.data()));
     }
 
     LOG("Initialized Textures");
     mInstance->mRenderer.FinishUploadingTextures();
     LOG("Uploaded textures to GPU");
+
+    mInstance->mLastFrameTime = std::chrono::high_resolution_clock::now();
 }
 
 Application& Application::Instance()
@@ -180,7 +183,13 @@ void Application::Run()
 
 void Application::Update()
 {
-    mRenderer.AddDebugText("Hello World!", 100, 100);
+    const auto now = std::chrono::high_resolution_clock::now();
+    const auto deltaTime = std::chrono::duration<float, std::milli>(now - mLastFrameTime).count();
+    mLastFrameTime = now;
+
+    mBird.Update(deltaTime);
+
+    mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 100, 100);
 }
 
 void Application::Render()
@@ -191,8 +200,8 @@ void Application::Render()
     static float xDir = 1.0f;
     static float yDir = 1.0f;
     
-    mBackground.Render(mRenderer, 0.1f, 0.0f, 0.0f);
-    mBird.Render(mRenderer, 0.1f, x, y);
+    mBackground.Render(mRenderer, 0.0f, 0.0f);
+    mBird.Render(mRenderer, x, y);
 
     x += 1.0f * xDir;
     y += 1.0f * yDir;
