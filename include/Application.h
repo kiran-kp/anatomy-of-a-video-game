@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Renderer.h>
+#include <Sprite.h>
 #include <Window.h>
 
 #include <memory>
@@ -32,7 +33,8 @@ private:
     Window mWindow;
     Renderer mRenderer;
 
-    TextureRef mBackground;
+    Sprite mBackground;
+    Sprite mBird;
 
     static std::unique_ptr<Application> mInstance;
 };

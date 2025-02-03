@@ -8,39 +8,21 @@
 #include <string_view>
 #include <thread>
 #include <vector>
+#include <unordered_map>
 
 std::unique_ptr<Application> Application::mInstance;
 
-class Sprite
+struct Image
 {
-public:
-    Sprite(float width, float height, float frameTime = 0.0f)
-        : mWidth(width)
-        , mHeight(height)
-		, mFrameTime(frameTime)
-    {
-    }
-
-	void AddTexture(TextureRef texture)
-	{
-		mTextures.push_back(texture);
-	}
-
-    void Render(Renderer& renderer)
-    {
-    };
-private:
-	float mWidth;
-	float mHeight;
-    size_t mFrame;
-    float mFrameTime;
-	std::vector<TextureRef> mTextures;
+    std::string path;
+    uint32_t width;
+    uint32_t height;
 };
 
 Application::Application()
     : mWindow()
     , mRenderer()
-	, mBackground()
+    , mBackground()
 {
 }
 
@@ -57,10 +39,10 @@ std::vector<uint8_t> ReadPNG(std::string_view path)
         return {};
     }
 
-	char header[8];
-	fread(header, 1, 8, file);
+    char header[8];
+    fread(header, 1, 8, file);
 
-	fseek(file, 0, SEEK_SET);
+    fseek(file, 0, SEEK_SET);
 
     png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
     if (!png)
@@ -109,8 +91,8 @@ std::vector<uint8_t> ReadPNG(std::string_view path)
     {
         for (uint32_t x = 0; x < width; ++x)
         {
-			png_bytep row = pngData[y];
-			png_byte pixelGroup = row[x / pixelsPerByte];
+            png_bytep row = pngData[y];
+            png_byte pixelGroup = row[x / pixelsPerByte];
             png_byte pixel = 0;
             if (bit_depth == 4)
             {
@@ -119,11 +101,11 @@ std::vector<uint8_t> ReadPNG(std::string_view path)
             else if (bit_depth == 8)
             {
                 pixel = row[x];
-			}
-			else
-			{
-				ensure(false);
-			}
+            }
+            else
+            {
+                ensure(false);
+            }
 
 
             png_color color = palette[pixel];
@@ -140,10 +122,6 @@ std::vector<uint8_t> ReadPNG(std::string_view path)
 
     return textureData;
 }
-
-TextureRef bird1;
-TextureRef bird2;
-TextureRef bird3;
 
 void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
 {
@@ -164,21 +142,39 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     mInstance->mRenderer.Initialize(mInstance->mWindow);
     LOG("Initialized Renderer");
 
+    std::unordered_map<std::string, Image> images = {
+        { "bird-downflap", { "assets/sprites/bluebird-downflap.png", 34, 24 } },
+        { "bird-midflap", { "assets/sprites/bluebird-midflap.png", 34, 24 } },
+        { "bird-upflap", { "assets/sprites/bluebird-upflap.png", 34, 24 } },
+        { "background", { "assets/sprites/background-night.png", 288, 512 } },
+        { "pipe", { "assets/sprites/pipe-green.png", 52, 320 } },
+        { "base", { "assets/sprites/base.png", 336, 112 } },
+        { "game-over", { "assets/sprites/gameover.png", 192, 42 } }
+    };
+
+
+
+    mInstance->mBird.Initialize(34, 24, 0.1f);
+
     {
         auto data = ReadPNG("assets/sprites/bluebird-downflap.png");
-        bird1 = mInstance->mRenderer.CreateTexture(34, 24, 4, data.data());
+        mInstance->mBird.AddTexture(mInstance->mRenderer.CreateTexture(34, 24, 4, data.data()));
     }
+    
     {
         auto data = ReadPNG("assets/sprites/bluebird-midflap.png");
-        bird2 = mInstance->mRenderer.CreateTexture(34, 24, 4, data.data());
+        mInstance->mBird.AddTexture(mInstance->mRenderer.CreateTexture(34, 24, 4, data.data()));
     }
+    
     {
         auto data = ReadPNG("assets/sprites/bluebird-upflap.png");
-        bird3 = mInstance->mRenderer.CreateTexture(34, 24, 4, data.data());
+        mInstance->mBird.AddTexture(mInstance->mRenderer.CreateTexture(34, 24, 4, data.data()));
     }
+    
+    mInstance->mBackground.Initialize(288, 512);
     {
         auto data = ReadPNG("assets/sprites/background-night.png");
-        mInstance->mBackground = mInstance->mRenderer.CreateTexture(288, 512, 4, data.data());
+        mInstance->mBackground.AddTexture(mInstance->mRenderer.CreateTexture(288, 512, 4, data.data()));
     }
 
     LOG("Initialized Textures");
@@ -207,12 +203,8 @@ void Application::Update()
 
 void Application::Render()
 {
-    mRenderer.AddQuad(0.0f, 0.0f, 288.0f, 512.0f, mBackground);
-
-    TextureRef bird[] = { bird1, bird2, bird3 };
-    static size_t frame = 0;
-	mRenderer.AddQuad(50.0f, 50.0f, 34.0f, 24.0f, bird[frame]);
-	frame = (frame + 1) % 3;
+    mBackground.Render(mRenderer, 0.1f, 0.0f, 0.0f);
+    mBird.Render(mRenderer, 0.1f, 50.0f, 50.0f);
 
     mRenderer.Render();
 }
