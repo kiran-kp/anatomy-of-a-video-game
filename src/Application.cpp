@@ -15,8 +15,8 @@ std::unique_ptr<Application> Application::mInstance;
 struct Image
 {
     std::string path;
-    uint32_t width;
-    uint32_t height;
+    float width;
+    float height;
 };
 
 Application::Application()
@@ -142,39 +142,21 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     mInstance->mRenderer.Initialize(mInstance->mWindow);
     LOG("Initialized Renderer");
 
-    std::unordered_map<std::string, Image> images = {
-        { "bird-downflap", { "assets/sprites/bluebird-downflap.png", 34, 24 } },
-        { "bird-midflap", { "assets/sprites/bluebird-midflap.png", 34, 24 } },
-        { "bird-upflap", { "assets/sprites/bluebird-upflap.png", 34, 24 } },
-        { "background", { "assets/sprites/background-night.png", 288, 512 } },
-        { "pipe", { "assets/sprites/pipe-green.png", 52, 320 } },
-        { "base", { "assets/sprites/base.png", 336, 112 } },
-        { "game-over", { "assets/sprites/gameover.png", 192, 42 } }
+    std::vector<std::pair<Sprite*, Image>> images = {
+        { &mInstance->mBird, { "assets/sprites/bluebird-downflap.png", 34.0f, 24.0f } },
+        { &mInstance->mBird, { "assets/sprites/bluebird-midflap.png", 34.0f, 24.0f } },
+        { &mInstance->mBird, { "assets/sprites/bluebird-upflap.png", 34.0f, 24.0f } },
+        { &mInstance->mBackground, { "assets/sprites/background-night.png", 288.0f, 512.0f } },
+        { &mInstance->mPipe, { "assets/sprites/pipe-green.png", 52.0f, 320.0f } },
+        { &mInstance->mBase, { "assets/sprites/base.png", 336.0f, 112.0f } },
+        { &mInstance->mGameOver, { "assets/sprites/gameover.png", 192.0f, 42.0f } }
     };
 
-
-
-    mInstance->mBird.Initialize(34, 24, 0.1f);
-
+    for (auto& [sprite, image] : images)
     {
-        auto data = ReadPNG("assets/sprites/bluebird-downflap.png");
-        mInstance->mBird.AddTexture(mInstance->mRenderer.CreateTexture(34, 24, 4, data.data()));
-    }
-    
-    {
-        auto data = ReadPNG("assets/sprites/bluebird-midflap.png");
-        mInstance->mBird.AddTexture(mInstance->mRenderer.CreateTexture(34, 24, 4, data.data()));
-    }
-    
-    {
-        auto data = ReadPNG("assets/sprites/bluebird-upflap.png");
-        mInstance->mBird.AddTexture(mInstance->mRenderer.CreateTexture(34, 24, 4, data.data()));
-    }
-    
-    mInstance->mBackground.Initialize(288, 512);
-    {
-        auto data = ReadPNG("assets/sprites/background-night.png");
-        mInstance->mBackground.AddTexture(mInstance->mRenderer.CreateTexture(288, 512, 4, data.data()));
+        auto data = ReadPNG(image.path);
+        sprite->Initialize(image.width, image.height, 0.1f);
+        sprite->AddTexture(mInstance->mRenderer.CreateTexture(static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height), 4, data.data()));
     }
 
     LOG("Initialized Textures");
@@ -203,8 +185,27 @@ void Application::Update()
 
 void Application::Render()
 {
+    static float x = 50.0f;
+    static float y = 50.0f;
+
+    static float xDir = 1.0f;
+    static float yDir = 1.0f;
+    
     mBackground.Render(mRenderer, 0.1f, 0.0f, 0.0f);
-    mBird.Render(mRenderer, 0.1f, 50.0f, 50.0f);
+    mBird.Render(mRenderer, 0.1f, x, y);
+
+    x += 1.0f * xDir;
+    y += 1.0f * yDir;
+
+    if ((x + mBird.GetWidth()) > 288.0f || x < 0.0f)
+    {
+        xDir *= -1.0f;
+    }
+
+    if ((y + mBird.GetHeight()) > 512.0f || y < 0.0f)
+    {
+        yDir *= -1.0f;
+    }
 
     mRenderer.Render();
 }

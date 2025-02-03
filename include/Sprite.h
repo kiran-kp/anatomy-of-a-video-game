@@ -12,6 +12,9 @@ public:
     void AddTexture(TextureRef texture);
     void Render(Renderer& renderer, float deltaTime, float x, float y);
 
+    float GetWidth() const { return mWidth; }
+    float GetHeight() const { return mHeight; }
+
 private:
     float mWidth;
     float mHeight;

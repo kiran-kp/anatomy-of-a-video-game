@@ -35,6 +35,9 @@ private:
 
     Sprite mBackground;
     Sprite mBird;
+    Sprite mPipe;
+    Sprite mBase;
+    Sprite mGameOver;
 
     static std::unique_ptr<Application> mInstance;
 };
