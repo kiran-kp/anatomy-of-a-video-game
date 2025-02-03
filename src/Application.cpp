@@ -201,7 +201,7 @@ void Application::Render()
     static float yDir = 1.0f;
     
     mBackground.Render(mRenderer, 0.0f, 0.0f);
-    mBird.Render(mRenderer, x, y);
+    mBird.Render(mRenderer, x, y, xDir < 0.0f);
 
     x += 1.0f * xDir;
     y += 1.0f * yDir;

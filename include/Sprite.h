@@ -12,7 +12,7 @@ public:
     void AddTexture(TextureRef texture);
 
     void Update(float deltaTime);
-    void Render(Renderer& renderer, float x, float y);
+    void Render(Renderer& renderer, float x, float y, bool flipX = false, bool flipY = false);
 
     float GetWidth() const { return mWidth; }
     float GetHeight() const { return mHeight; }

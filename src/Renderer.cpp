@@ -379,10 +379,10 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
 
     // Create root signature
     {
-        CD3DX12_DESCRIPTOR_RANGE ranges[1];
+        CD3DX12_DESCRIPTOR_RANGE ranges[1]{};
         ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);  // 1 SRV at register t0
 
-        CD3DX12_ROOT_PARAMETER rootParameters[1];
+        CD3DX12_ROOT_PARAMETER rootParameters[1]{};
         rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
 
         D3D12_STATIC_SAMPLER_DESC sampler = {};
@@ -934,7 +934,7 @@ public:
     void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
     void Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap);
 
-    void AddQuad(float x, float y, float width, float height, TextureRef texture);
+    void AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture);
 
 private:
     constexpr static uint32_t MaxQuads = 64;
@@ -945,6 +945,8 @@ private:
         float y;
         float width;
         float height;
+        bool flipX;
+        bool flipY;
         TextureRef texture;
     };
 
@@ -1093,10 +1095,10 @@ void TexturedQuadRenderer::Render(ID3D12GraphicsCommandList* commandList, Descri
         float width = (q.width / mScreenWidth) * 2.0f;
         float height = (q.height / mScreenHeight) * 2.0f;
 
-        float u1 = 0.0f;
-        float v1 = 0.0f;
-        float u2 = 1.0f;
-        float v2 = 1.0f;
+        float u1 = q.flipX ? 1.0f : 0.0f;
+        float v1 = q.flipY ? 1.0f : 0.0f;
+        float u2 = q.flipX ? 0.0f : 1.0f;
+        float v2 = q.flipY ? 0.0f : 1.0f;
 
         Vertex* vertices = reinterpret_cast<Vertex*>(pVertexDataBegin);
         vertices[0] = { { x, y, 0.0f }, { u1, v1 } };
@@ -1131,10 +1133,10 @@ void TexturedQuadRenderer::Render(ID3D12GraphicsCommandList* commandList, Descri
     mQuads.clear();
 }
 
-void TexturedQuadRenderer::AddQuad(float x, float y, float width, float height, TextureRef texture)
+void TexturedQuadRenderer::AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture)
 {
     ensure(mQuads.size() < MaxQuads);
-    mQuads.push_back({ x, y, width, height, texture });
+    mQuads.push_back({ x, y, width, height, flipX, flipY, texture });
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1162,7 +1164,7 @@ public:
     void WaitForPreviousFrame();
 
     void AddDebugText(std::string_view text, int32_t x, int32_t y);
-    void AddQuad(float x, float y, float width, float height, TextureRef texture);
+    void AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture);
 
 private:
     ID3D12Device* mDevice;
@@ -1461,9 +1463,9 @@ void RendererImpl::AddDebugText(std::string_view text, int32_t x, int32_t y)
     mTextRenderer.AddDebugText(text, x, y);
 }
 
-void RendererImpl::AddQuad(float x, float y, float width, float height, TextureRef texture)
+void RendererImpl::AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture)
 {
-    mQuadRenderer.AddQuad(x, y, width, height, texture);
+    mQuadRenderer.AddQuad(x, y, width, height, flipX, flipY, texture);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1511,7 +1513,7 @@ TextureRef Renderer::CreateTexture(uint32_t width, uint32_t height, uint32_t pix
     return mImpl->CreateTexture(width, height, pixelSize, data);
 }
 
-void Renderer::AddQuad(float x, float y, float width, float height, TextureRef texture)
+void Renderer::AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture)
 {
-    mImpl->AddQuad(x, y, width, height, texture);
+    mImpl->AddQuad(x, y, width, height, flipX, flipY, texture);
 }

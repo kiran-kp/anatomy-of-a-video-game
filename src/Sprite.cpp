@@ -29,9 +29,9 @@ void Sprite::Update(float deltaTime)
     }
 }
 
-void Sprite::Render(Renderer& renderer, float x, float y)
+void Sprite::Render(Renderer& renderer, float x, float y, bool flipX, bool flipY)
 {
     assert(!mTextures.empty());
 
-    renderer.AddQuad(x, y, mWidth, mHeight, mTextures[mFrame]);
+    renderer.AddQuad(x, y, mWidth, mHeight, flipX, flipY, mTextures[mFrame]);
 }
