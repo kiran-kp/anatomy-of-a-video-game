@@ -1048,19 +1048,6 @@ void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsComman
     }
 
     {
-        /*
-        Vertex vertices[] =
-        {
-            { { -1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f } },
-            { {  1.0f,  1.0f, 0.0f }, { 1.0f, 0.0f } },
-            { { -1.0f, -1.0f, 0.0f }, { 0.0f, 1.0f } },
-
-            { { -1.0f, -1.0f, 0.0f }, { 0.0f, 1.0f } },
-            { {  1.0f,  1.0f, 0.0f }, { 1.0f, 0.0f } },
-            { {  1.0f, -1.0f, 0.0f }, { 1.0f, 1.0f } }
-        };
-        */
-
         const uint32_t vertexBufferSize = MaxQuads * 6 * sizeof(Vertex);
         ensure(SUCCEEDED(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
                                                          D3D12_HEAP_FLAG_NONE,
@@ -1068,14 +1055,6 @@ void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsComman
                                                          D3D12_RESOURCE_STATE_GENERIC_READ,
                                                          nullptr,
                                                          IID_PPV_ARGS(&mVertexBuffer))));
-
-        /*
-        UINT8* pVertexDataBegin;
-        CD3DX12_RANGE readRange(0, 0);
-        ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
-        memcpy(pVertexDataBegin, vertices, sizeof(vertices));
-        mVertexBuffer->Unmap(0, nullptr);
-        */
 
         mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
         mVertexBufferView.StrideInBytes = sizeof(Vertex);
