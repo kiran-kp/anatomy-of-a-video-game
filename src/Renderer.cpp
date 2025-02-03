@@ -146,7 +146,7 @@ void DescriptorHeap::CreateSRV(ID3D12Device* device, Texture& texture, size_t in
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = 1;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE handle = GetCPUHandle(index);
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = GetCPUHandle(index);
     device->CreateShaderResourceView(texture.Get(), &srvDesc, handle);
 }
 
@@ -340,7 +340,7 @@ private:
     ID3D12Resource* mVertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW mVertexBufferView;
 
-	TextureRef mTexture;
+    TextureRef mTexture;
 };
 
 TexturedTriangleRenderer::~TexturedTriangleRenderer()
@@ -365,7 +365,7 @@ void TexturedTriangleRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCo
     mScissorRect.right= static_cast<uint64_t>(width);
     mScissorRect.bottom = static_cast<uint64_t>(height);
 
-	mTexture = texture;
+    mTexture = texture;
 
     // Create root signature
     {
@@ -1162,7 +1162,7 @@ public:
     TextureRef CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data);
 
     void InitializeRenderers();
-	void FinishUploadingTextures();
+    void FinishUploadingTextures();
 
     void PopulateCommandListAndSubmit();
     void Present();
@@ -1488,7 +1488,7 @@ void Renderer::Initialize(Window& window)
 
 void Renderer::FinishUploadingTextures()
 {
-	mImpl->FinishUploadingTextures();
+    mImpl->FinishUploadingTextures();
 }
 
 void Renderer::Shutdown()
