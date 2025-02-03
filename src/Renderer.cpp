@@ -1102,7 +1102,6 @@ void TexturedQuadRenderer::Render(ID3D12GraphicsCommandList* commandList, Descri
     commandList->RSSetViewports(1, &mViewport);
     commandList->RSSetScissorRects(1, &mScissorRect);
 
-    // This is the actual stuff we are drawing
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
 
