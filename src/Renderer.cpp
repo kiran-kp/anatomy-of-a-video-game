@@ -3,8 +3,11 @@
 #include <Util.h>
 #include <Window.h>
 
-// This helper library has to be included before any SDK headers
-#include <directx/d3dx12.h>
+
+#include <WICTextureLoader12.h>
+// Hack: Just include the source for this here to avoid having to set up a project just statically compile this
+// This also includes d3dx12.h which needs to be done before other d3d headers
+#include <WICTextureLoader12.cpp>
 
 #include <d3d12.h>
 #include <d3dcompiler.h>
@@ -27,6 +30,7 @@ public:
     ~Texture() = default;
 
     void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, uint32_t width, uint32_t height, uint32_t pixelSize, const void* data);
+    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, std::string_view path);
     void Destroy();
 
     ID3D12Resource* Get() const
@@ -80,6 +84,34 @@ void Texture::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* comman
     textureData.pData = data;
     textureData.RowPitch = width * pixelSize;
     textureData.SlicePitch = textureData.RowPitch * height;
+
+    // This is a helper function in d3dx12.h that copies data to a default heap (used by the texture) via the upload heap using CopyTextureRegion.
+    UpdateSubresources(commandList, mTexture, textureUploadHeap, 0, 0, 1, &textureData);
+    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(mTexture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    commandList->ResourceBarrier(1, &barrier);
+}
+
+void Texture::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, std::string_view path)
+{
+    std::unique_ptr<uint8_t[]> data;
+    D3D12_SUBRESOURCE_DATA textureData = {};
+    std::wstring wpath(std::begin(path), std::end(path));
+    LoadWICTextureFromFile(device, wpath.c_str(), &mTexture, data, textureData);
+
+    const UINT64 uploadBufferSize = GetRequiredIntermediateSize(mTexture, 0, 1);
+
+    // Create the GPU upload buffer.
+    ID3D12Resource* textureUploadHeap;
+    {
+        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+        ensure(SUCCEEDED(device->CreateCommittedResource(&heapProperties,
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &bufferDesc,
+                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&textureUploadHeap))));
+    }
 
     // This is a helper function in d3dx12.h that copies data to a default heap (used by the texture) via the upload heap using CopyTextureRegion.
     UpdateSubresources(commandList, mTexture, textureUploadHeap, 0, 0, 1, &textureData);
@@ -1155,6 +1187,7 @@ public:
     void CreateFence();
 
     TextureRef CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data);
+    TextureRef CreateTexture(std::string_view path);
 
     void InitializeRenderers();
     void FinishUploadingTextures();
@@ -1320,6 +1353,18 @@ TextureRef RendererImpl::CreateTexture(uint32_t width, uint32_t height, uint32_t
 {
     Texture texture;
     texture.Initialize(mDevice, mCommandList, width, height, pixelSize, data);
+    size_t index = mTextures.size();
+    assert(index < NumSRVs);
+    mTextures.push_back(std::move(texture));
+
+    mSrvHeap.CreateSRV(mDevice, texture, index);
+    return { index };
+}
+
+TextureRef RendererImpl::CreateTexture(std::string_view path)
+{
+    Texture texture;
+    texture.Initialize(mDevice, mCommandList, path);
     size_t index = mTextures.size();
     assert(index < NumSRVs);
     mTextures.push_back(std::move(texture));
@@ -1508,9 +1553,9 @@ void Renderer::AddDebugText(std::string_view text, int32_t x, int32_t y)
     mImpl->AddDebugText(text, x, y);
 }
 
-TextureRef Renderer::CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data)
+TextureRef Renderer::CreateTexture(std::string_view path)
 {
-    return mImpl->CreateTexture(width, height, pixelSize, data);
+    return mImpl->CreateTexture(path);
 }
 
 void Renderer::AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture)

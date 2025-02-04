@@ -51,8 +51,7 @@ public class BirdGameProject : Project
         conf.LibraryFiles.Add("d3dcompiler");
         conf.LibraryFiles.Add("dxguid");
 
-        conf.AddPrivateDependency<LibPNG>(target);
-        conf.AddPrivateDependency<Zlib>(target);
+        conf.AddPrivateDependency<WICTextureLoader>(target);
     }
 }
 

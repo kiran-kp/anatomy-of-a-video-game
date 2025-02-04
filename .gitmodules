@@ -1,9 +1,6 @@
 [submodule "assets"]
 	path = assets
 	url = https://github.com/samuelcust/flappy-bird-assets.git
-[submodule "extern/libpng"]
-	path = extern/libpng
-	url = https://github.com/pnggroup/libpng
 [submodule "extern/DirectXTex"]
 	path = extern/DirectXTex
 	url = https://github.com/microsoft/DirectXTex.git

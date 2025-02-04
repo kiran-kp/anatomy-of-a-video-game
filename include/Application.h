@@ -4,7 +4,6 @@
 #include <Sprite.h>
 #include <Window.h>
 
-#include <chrono>
 #include <memory>
 
 class Application
@@ -28,7 +27,7 @@ private:
     Application();
     Application(const Application&) = delete;
 
-    void Update();
+    void Update(float deltaTime);
     void Render();
 
     Window mWindow;
@@ -40,7 +39,6 @@ private:
     Sprite mBase;
     Sprite mGameOver;
 
-    std::chrono::high_resolution_clock::time_point mLastFrameTime;
 
     static std::unique_ptr<Application> mInstance;
 };

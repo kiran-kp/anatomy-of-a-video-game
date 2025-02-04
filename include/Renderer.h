@@ -25,7 +25,7 @@ public:
 
     void AddDebugText(std::string_view text, int32_t x, int32_t y);
     
-    TextureRef CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data);
+    TextureRef CreateTexture(std::string_view path);
     void AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture);
 
 private:
