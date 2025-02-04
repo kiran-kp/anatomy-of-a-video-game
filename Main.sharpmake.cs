@@ -1,6 +1,6 @@
 using Sharpmake;
 
-[module: Sharpmake.Include("extern/libpng.sharpmake.cs")]
+[module: Sharpmake.Include("extern/externs.sharpmake.cs")]
 
 [Generate]
 public class BirdGameProject : Project
@@ -33,9 +33,18 @@ public class BirdGameProject : Project
 
         conf.Options.Add(Options.Vc.Compiler.CppLanguageStandard.CPP20);
         conf.Options.Add(Options.Vc.Compiler.Exceptions.Enable);
+        if (target.Optimization == Optimization.Debug)
+        {
+            conf.Options.Add(Options.Vc.Compiler.RuntimeLibrary.MultiThreadedDebugDLL);
+        }
+        else
+        {
+            conf.Options.Add(Options.Vc.Compiler.RuntimeLibrary.MultiThreadedDLL);
+        }
 
         conf.Options.Add(Options.Vc.Linker.SubSystem.Windows);
         conf.Options.Add(Options.Vc.Linker.LargeAddress.SupportLargerThan2Gb);
+
 
         conf.LibraryFiles.Add("d3d12");
         conf.LibraryFiles.Add("dxgi");
@@ -43,6 +52,7 @@ public class BirdGameProject : Project
         conf.LibraryFiles.Add("dxguid");
 
         conf.AddPrivateDependency<LibPNG>(target);
+        conf.AddPrivateDependency<Zlib>(target);
     }
 }
 
