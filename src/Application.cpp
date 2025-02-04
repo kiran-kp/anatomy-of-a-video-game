@@ -114,7 +114,7 @@ std::vector<uint8_t> ReadPNG(std::string_view path)
             textureData[base + 0] = color.red;
             textureData[base + 1] = color.green;
             textureData[base + 2] = color.blue;
-            textureData[base + 3] = transAlpha ? transAlpha[pixel] : 0xFF;
+            textureData[base + 3] = transAlpha ? (transAlpha[pixel] ? 0xFF : 0x00) : 0xFF;
         }
     }
 
