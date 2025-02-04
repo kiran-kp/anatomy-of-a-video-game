@@ -11,3 +11,8 @@ This is a clone of the popular Flappy Bird game.
 ### Module 2
 - [X] Draw a texture on screen
 - [X] Add a method to draw text on screen using bitmap fonts
+
+### Module 3
+- [X] Create a `Sprite` object that the game code can use to draw images on screen
+- [X] Support loading PNG images into sprites
+- [X] Support animated sprites
