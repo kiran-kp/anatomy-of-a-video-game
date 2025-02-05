@@ -90,26 +90,18 @@ void Application::Run()
     }
 }
 
+static float x = 50.0f;
+static float y = 50.0f;
+
+static float xDir = 1.0f;
+static float yDir = 1.0f;
+
 void Application::Update(float deltaTime)
 {
     mBird.Update(deltaTime);
 
-    mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 100, 100);
-}
-
-void Application::Render()
-{
-    static float x = 50.0f;
-    static float y = 50.0f;
-
-    static float xDir = 1.0f;
-    static float yDir = 1.0f;
-    
-    mBackground.Render(mRenderer, 0.0f, 0.0f);
-    mBird.Render(mRenderer, x, y, xDir < 0.0f);
-
-    x += 1.0f * xDir;
-    y += 1.0f * yDir;
+    x += 100.0f * xDir * deltaTime / 1000.0f;
+    y += 100.0f * yDir * deltaTime / 1000.0f;
 
     if ((x + mBird.GetWidth()) > 288.0f || x < 0.0f)
     {
@@ -120,6 +112,14 @@ void Application::Render()
     {
         yDir *= -1.0f;
     }
+
+    mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 100, 100);
+}
+
+void Application::Render()
+{
+    mBackground.Render(mRenderer, 0.0f, 0.0f);
+    mBird.Render(mRenderer, x, y, xDir < 0.0f);
 
     mRenderer.Render();
 }
