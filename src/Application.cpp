@@ -103,17 +103,18 @@ void Application::Update(float deltaTime)
     x += 100.0f * xDir * deltaTime / 1000.0f;
     y += 100.0f * yDir * deltaTime / 1000.0f;
 
-    if ((x + mBird.GetWidth()) > 288.0f || x < 0.0f)
+    if ((x + mBird.GetWidth()) >= 288.0f || x <= 0.0f)
     {
         xDir *= -1.0f;
     }
 
-    if ((y + mBird.GetHeight()) > 512.0f || y < 0.0f)
+    if ((y + mBird.GetHeight()) >= 512.0f || y <= 0.0f)
     {
         yDir *= -1.0f;
     }
 
     mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 100, 100);
+    mRenderer.AddQuad(95.0f, 95.0f, 150.0f, 20.0f, DarkBlue);
 }
 
 void Application::Render()

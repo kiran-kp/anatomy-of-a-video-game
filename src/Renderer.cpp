@@ -1173,6 +1173,177 @@ void TexturedQuadRenderer::AddQuad(const float x, const float y, const float wid
 
 // ------------------------------------------------------------------------------------------------
 
+class ColoredQuadRenderer
+{
+public:
+    ColoredQuadRenderer() = default;
+    ~ColoredQuadRenderer() = default;
+
+    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
+    void Render(ID3D12GraphicsCommandList* commandList);
+
+    void AddQuad(const float x, const float y, const float width, const float height, const DirectX::XMFLOAT4& color);
+
+private:
+    constexpr static uint32_t MaxQuads = 64;
+
+    struct Quad
+    {
+        float x;
+        float y;
+        float width;
+        float height;
+        DirectX::XMFLOAT4 color;
+    };
+
+    struct Vertex
+    {
+        DirectX::XMFLOAT3 position;
+        DirectX::XMFLOAT4 color;
+    };
+
+    ID3D12RootSignature* mRootSignature;
+    ID3D12PipelineState* mPipelineState;
+
+    ID3D12Resource* mVertexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW mVertexBufferView;
+
+    float mScreenWidth;
+    float mScreenHeight;
+
+    CD3DX12_VIEWPORT mViewport;
+    CD3DX12_RECT mScissorRect;
+
+    std::vector<Quad> mQuads;
+};
+
+void ColoredQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight)
+{
+    mScreenWidth = screenWidth;
+    mScreenHeight = screenHeight;
+
+    mViewport = CD3DX12_VIEWPORT(0.0f, 0.0f, screenWidth, screenHeight);
+    mScissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(screenWidth), static_cast<LONG>(screenHeight));
+
+    {
+        D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.NumParameters = 0;
+        rootSignatureDesc.pParameters = nullptr;
+        rootSignatureDesc.NumStaticSamplers = 0;
+        rootSignatureDesc.pStaticSamplers = nullptr;
+        rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+        ID3DBlob* signature;
+        ID3DBlob* error;
+        ensure(SUCCEEDED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error)));
+        ensure(SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&mRootSignature))));
+    }
+
+    // Create pipeline state
+    {
+        ID3DBlob* vertexShader;
+        ID3DBlob* pixelShader;
+
+#if defined(_DEBUG)
+        UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+        UINT compileFlags = 0;
+#endif
+
+        ensure(SUCCEEDED(D3DCompileFromFile(L"data/basic.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr)));
+        ensure(SUCCEEDED(D3DCompileFromFile(L"data/basic.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)));
+
+        D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+        {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        };
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+        psoDesc.pRootSignature = mRootSignature;
+        psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader);
+        psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader);
+        psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+        psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+        psoDesc.DepthStencilState.DepthEnable = FALSE;
+        psoDesc.DepthStencilState.StencilEnable = FALSE;
+        psoDesc.SampleMask = UINT_MAX;
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        psoDesc.NumRenderTargets = 1;
+        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        psoDesc.SampleDesc.Count = 1;
+
+        ensure(SUCCEEDED(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPipelineState))));
+    }
+
+    {
+        const uint32_t vertexBufferSize = MaxQuads * 6 * sizeof(Vertex);
+        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
+        ensure(SUCCEEDED(device->CreateCommittedResource(&heapProperties,
+                                                         D3D12_HEAP_FLAG_NONE,
+                                                         &bufferDesc,
+                                                         D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                         nullptr,
+                                                         IID_PPV_ARGS(&mVertexBuffer))));
+
+        mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
+        mVertexBufferView.StrideInBytes = sizeof(Vertex);
+        mVertexBufferView.SizeInBytes = vertexBufferSize;
+    }
+}
+
+void ColoredQuadRenderer::Render(ID3D12GraphicsCommandList* commandList)
+{
+    UINT8* pVertexDataBegin;
+    CD3DX12_RANGE readRange(0, 0);
+    ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
+
+    for (const Quad& q : mQuads)
+    {
+        // Convert screen coordinates to NDC
+        // NDC_x = (2 * pixel_x / screen_width) - 1
+        // NDC_y = 1 - (2 * pixel_y / screen_height)
+        float x = ((q.x / mScreenWidth) * 2.0f) - 1.0f;
+        float y = 1.0f - ((q.y / mScreenHeight) * 2.0f);
+        float width = (q.width / mScreenWidth) * 2.0f;
+        float height = (q.height / mScreenHeight) * 2.0f;
+
+        Vertex* vertices = reinterpret_cast<Vertex*>(pVertexDataBegin);
+        vertices[0] = { { x, y, 0.0f }, q.color };
+        vertices[1] = { { x + width, y, 0.0f }, q.color };
+        vertices[2] = { { x, y - height, 0.0f }, q.color };
+
+        vertices[3] = { { x, y - height, 0.0f }, q.color };
+        vertices[4] = { { x + width, y, 0.0f }, q.color };
+        vertices[5] = { { x + width, y - height, 0.0f }, q.color };
+
+        pVertexDataBegin += 6 * sizeof(Vertex);
+    }
+
+    mVertexBuffer->Unmap(0, nullptr);
+
+    commandList->SetGraphicsRootSignature(mRootSignature);
+    commandList->SetPipelineState(mPipelineState);
+    commandList->RSSetViewports(1, &mViewport);
+    commandList->RSSetScissorRects(1, &mScissorRect);
+
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
+
+    commandList->DrawInstanced(static_cast<uint32_t>(6 * mQuads.size()), 1, 0, 0);
+    mQuads.clear();
+}
+
+void ColoredQuadRenderer::AddQuad(const float x, const float y, const float width, const float height, const DirectX::XMFLOAT4& color)
+{
+    ensure(mQuads.size() < MaxQuads);
+    mQuads.push_back({ x, y, width, height, color });
+}
+
+// ------------------------------------------------------------------------------------------------
+
 class RendererImpl
 {
 public:
@@ -1204,6 +1375,11 @@ public:
                  const bool flipX,
                  const bool flipY,
                  const TextureRef texture);
+    void AddQuad(const float x,
+                 const float y,
+                 const float width,
+                 const float height,
+                 const Color& color);
 
 private:
     ID3D12Device* mDevice;
@@ -1223,8 +1399,9 @@ private:
     DescriptorHeap mSrvHeap;
     std::vector<Texture> mTextures;
 
-    TexturedQuadRenderer mQuadRenderer;
+    TexturedQuadRenderer mTexturedQuadRenderer;
     TextRenderer mTextRenderer;
+    ColoredQuadRenderer mColoredQuadRenderer;
 
     uint32_t mFrameIndex;
     ID3D12Fence* mFence;
@@ -1424,13 +1601,17 @@ void RendererImpl::InitializeRenderers()
 
     {
         const std::vector<uint8_t> textureData = GenerateTextureData(256, 256, 4);
-        mQuadRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
+        mTexturedQuadRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
     }
 
     {
         std::vector<uint8_t> textureData = Font::GenerateTextureData();
         TextureRef font{ CreateTexture(Font::TextureWidth, Font::TextureHeight, Font::TexturePixelSize, textureData.data()) };
         mTextRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight), font);
+    }
+
+    {
+        mColoredQuadRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
     }
 }
 
@@ -1469,7 +1650,8 @@ void RendererImpl::PopulateCommandListAndSubmit()
     ID3D12DescriptorHeap* heaps[] = { mSrvHeap.Get() };
     mCommandList->SetDescriptorHeaps(1, heaps);
 
-    mQuadRenderer.Render(mCommandList, mSrvHeap);
+    mTexturedQuadRenderer.Render(mCommandList, mSrvHeap);
+    mColoredQuadRenderer.Render(mCommandList);
     mTextRenderer.Render(mCommandList, mSrvHeap);
 
     // Transition back buffer back to the present state since we are done drawing to it and want it ready for present
@@ -1522,8 +1704,18 @@ void RendererImpl::AddQuad(const float x,
                            const bool flipY,
                            const TextureRef texture)
 {
-    mQuadRenderer.AddQuad(x, y, width, height, flipX, flipY, texture);
+    mTexturedQuadRenderer.AddQuad(x, y, width, height, flipX, flipY, texture);
 }
+
+void RendererImpl::AddQuad(const float x,
+                           const float y,
+                           const float width,
+                           const float height,
+                           const Color& color)
+{
+    mColoredQuadRenderer.AddQuad(x, y, width, height, DirectX::XMFLOAT4(color.r, color.g, color.b, color.a));
+}
+
 
 // ------------------------------------------------------------------------------------------------
 
@@ -1579,4 +1771,9 @@ void Renderer::AddQuad(const float x,
                        const TextureRef texture)
 {
     mImpl->AddQuad(x, y, width, height, flipX, flipY, texture);
+}
+
+void Renderer::AddQuad(const float x, const float y, const float width, const float height, const Color& color)
+{
+    mImpl->AddQuad(x, y, width, height, color);
 }
