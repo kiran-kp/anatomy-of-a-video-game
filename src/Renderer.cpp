@@ -544,7 +544,7 @@ public:
 
     void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef font);
     void Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap);
-    void AddDebugText(std::string_view text, int32_t x, int32_t y);
+    void AddDebugText(const std::string_view text, const int32_t x, const int32_t y);
 
 private:
     struct Vertex
@@ -947,7 +947,7 @@ void TextRenderer::Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap
     commandList->DrawInstanced(vertexCount, 1, 0, 0);
 }
 
-void TextRenderer::AddDebugText(std::string_view text, int32_t x, int32_t y)
+void TextRenderer::AddDebugText(const std::string_view text, const int32_t x, const int32_t y)
 {
     ensure((mStrings.size() + text.size()) < MaxCharacters);
     const size_t start = mStrings.size();
@@ -966,7 +966,7 @@ public:
     void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
     void Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap);
 
-    void AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture);
+    void AddQuad(const float x, const float y, const float width, const float height, const bool flipX, const bool flipY, const TextureRef texture);
 
 private:
     constexpr static uint32_t MaxQuads = 64;
@@ -1165,7 +1165,7 @@ void TexturedQuadRenderer::Render(ID3D12GraphicsCommandList* commandList, Descri
     mQuads.clear();
 }
 
-void TexturedQuadRenderer::AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture)
+void TexturedQuadRenderer::AddQuad(const float x, const float y, const float width, const float height, const bool flipX, const bool flipY, const TextureRef texture)
 {
     ensure(mQuads.size() < MaxQuads);
     mQuads.push_back({ x, y, width, height, flipX, flipY, texture });
@@ -1187,7 +1187,7 @@ public:
     void CreateFence();
 
     TextureRef CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data);
-    TextureRef CreateTexture(std::string_view path);
+    TextureRef CreateTexture(const std::string_view path);
 
     void InitializeRenderers();
     void FinishUploadingTextures();
@@ -1196,8 +1196,14 @@ public:
     void Present();
     void WaitForPreviousFrame();
 
-    void AddDebugText(std::string_view text, int32_t x, int32_t y);
-    void AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture);
+    void AddDebugText(const std::string_view text, const int32_t x, const int32_t y);
+    void AddQuad(const float x,
+                 const float y,
+                 const float width,
+                 const float height,
+                 const bool flipX,
+                 const bool flipY,
+                 const TextureRef texture);
 
 private:
     ID3D12Device* mDevice;
@@ -1361,7 +1367,7 @@ TextureRef RendererImpl::CreateTexture(uint32_t width, uint32_t height, uint32_t
     return { index };
 }
 
-TextureRef RendererImpl::CreateTexture(std::string_view path)
+TextureRef RendererImpl::CreateTexture(const std::string_view path)
 {
     Texture texture;
     texture.Initialize(mDevice, mCommandList, path);
@@ -1503,12 +1509,18 @@ void RendererImpl::WaitForPreviousFrame()
     mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 }
 
-void RendererImpl::AddDebugText(std::string_view text, int32_t x, int32_t y)
+void RendererImpl::AddDebugText(const std::string_view text, const int32_t x, const int32_t y)
 {
     mTextRenderer.AddDebugText(text, x, y);
 }
 
-void RendererImpl::AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture)
+void RendererImpl::AddQuad(const float x,
+                           const float y,
+                           const float width,
+                           const float height,
+                           const bool flipX,
+                           const bool flipY,
+                           const TextureRef texture)
 {
     mQuadRenderer.AddQuad(x, y, width, height, flipX, flipY, texture);
 }
@@ -1548,17 +1560,23 @@ void Renderer::Render()
     mImpl->WaitForPreviousFrame();
 }
 
-void Renderer::AddDebugText(std::string_view text, int32_t x, int32_t y)
+void Renderer::AddDebugText(const std::string_view text, const int32_t x, const int32_t y)
 {
     mImpl->AddDebugText(text, x, y);
 }
 
-TextureRef Renderer::CreateTexture(std::string_view path)
+TextureRef Renderer::CreateTexture(const std::string_view path)
 {
     return mImpl->CreateTexture(path);
 }
 
-void Renderer::AddQuad(float x, float y, float width, float height, bool flipX, bool flipY, TextureRef texture)
+void Renderer::AddQuad(const float x,
+                       const float y,
+                       const float width,
+                       const float height,
+                       const bool flipX,
+                       const bool flipY,
+                       const TextureRef texture)
 {
     mImpl->AddQuad(x, y, width, height, flipX, flipY, texture);
 }
