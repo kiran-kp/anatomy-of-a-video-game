@@ -39,7 +39,7 @@ public:
 
     void AddDebugText(const std::string_view text, const int32_t x, const int32_t y);
     
-    TextureRef CreateTexture(std::string_view path);
+    TextureRef CreateTexture(const std::string_view path);
     void AddQuad(const float x,
                  const float y,
                  const float width,
