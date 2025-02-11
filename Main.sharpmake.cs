@@ -10,6 +10,7 @@ public class BirdGameProject : Project
         Name = "BirdGame";
         AddTargets(new Target(Platform.win64, DevEnv.vs2022, Optimization.Debug | Optimization.Release));
         SourceRootPath = @"[project.SharpmakeCsPath]\src";
+        AdditionalSourceRootPaths.Add(@"[project.SharpmakeCsPath]\include");
     }
 
     [Configure()]
