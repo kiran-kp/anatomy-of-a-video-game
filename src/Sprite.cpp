@@ -6,7 +6,6 @@ void Sprite::Initialize(float width, float height, float frameTime)
 {
     mWidth = width;
     mHeight = height;
-    mFrame = 0;
     mFrameTime = frameTime;
 }
 
@@ -15,23 +14,10 @@ void Sprite::AddTexture(TextureRef texture)
     mTextures.push_back(texture);
 }
 
-void Sprite::Update(float deltaTime)
-{
-    if (mFrameTime > 0.0f)
-    {
-        mTime -= deltaTime;
-
-        if (mTime <= 0.0f)
-        {
-            mTime = mFrameTime;
-            mFrame = (mFrame + 1) % mTextures.size();
-        }
-    }
-}
-
-void Sprite::Render(Renderer& renderer, float x, float y, bool flipX, bool flipY)
+void Sprite::RenderFrame(Renderer& renderer, float x, float y, size_t frame, bool flipX, bool flipY) const
 {
     assert(!mTextures.empty());
+    assert(frame < mTextures.size());
 
-    renderer.AddQuad(x, y, mWidth, mHeight, flipX, flipY, mTextures[mFrame]);
+    renderer.AddQuad(x, y, mWidth, mHeight, flipX, flipY, mTextures[frame]);
 }

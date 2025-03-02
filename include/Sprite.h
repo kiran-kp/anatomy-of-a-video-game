@@ -1,5 +1,6 @@
-#include <Renderer.h>
+#pragma once
 
+#include <Renderer.h>
 #include <vector>
 
 class Sprite
@@ -11,17 +12,16 @@ public:
     void Initialize(float width, float height, float frameTime = 0.0f);
     void AddTexture(TextureRef texture);
 
-    void Update(float deltaTime);
-    void Render(Renderer& renderer, float x, float y, bool flipX = false, bool flipY = false);
+    void RenderFrame(Renderer& renderer, float x, float y, size_t frame, bool flipX = false, bool flipY = false) const;
 
     float GetWidth() const { return mWidth; }
     float GetHeight() const { return mHeight; }
+    float GetFrameTime() const { return mFrameTime; }
+    size_t GetTextureCount() const { return mTextures.size(); }
 
 private:
     float mWidth;
     float mHeight;
-    size_t mFrame;
     float mFrameTime;
-    float mTime;
     std::vector<TextureRef> mTextures;
 };

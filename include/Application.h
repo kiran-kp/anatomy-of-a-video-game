@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Renderer.h>
-#include <Sprite.h>
+#include <SpriteInstance.h>
 #include <Window.h>
 
 #include <memory>
@@ -38,6 +38,8 @@ private:
     Sprite mPipe;
     Sprite mBase;
     Sprite mGameOver;
+
+	SpriteInstance mBirdInstance;
 
 
     static std::unique_ptr<Application> mInstance;
