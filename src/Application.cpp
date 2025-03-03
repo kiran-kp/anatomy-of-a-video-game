@@ -65,7 +65,7 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
         sprite->AddTexture(mInstance->mRenderer.CreateTexture(image.path));
     }
 
-	mInstance->mBirdInstance.Initialize(&mInstance->mBird);
+    mInstance->mBirdInstance.Initialize(&mInstance->mBird);
 
     LOG("Initialized Textures");
     mInstance->mRenderer.FinishUploadingTextures();
@@ -114,8 +114,8 @@ void Application::Update(float deltaTime)
     {
         yDir *= -1.0f;
     }
-	mBirdInstance.SetPosition(x, y);
-	mBirdInstance.SetFlip(xDir < 0.0f, false);
+    mBirdInstance.SetPosition(x, y);
+    mBirdInstance.SetFlip(xDir < 0.0f, false);
     mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 100, 100);
     mRenderer.AddQuad(95.0f, 95.0f, 150.0f, 20.0f, DarkBlue);
 }
