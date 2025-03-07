@@ -66,6 +66,16 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     }
 
     mInstance->mBirdInstance.Initialize(&mInstance->mBird);
+    int i = 0;
+    bool flipped = false;
+    for (auto& p : mInstance->mPipeInstances)
+    {
+        p.Initialize(&mInstance->mPipe);
+        p.SetPosition(i * mInstance->mPipe.GetWidth(), 20.0f);
+        p.SetFlip(false, flipped);
+        flipped = !flipped;
+        i++;
+    }
 
     LOG("Initialized Textures");
     mInstance->mRenderer.FinishUploadingTextures();
@@ -123,6 +133,12 @@ void Application::Update(float deltaTime)
 void Application::Render()
 {
     mBackground.RenderFrame(mRenderer, 0.0f, 0.0f, 0);
+
+    for (auto& p : mPipeInstances)
+    {
+        p.Render(mRenderer);
+    }
+
     mBirdInstance.Render(mRenderer);
 
     mRenderer.Render();

@@ -4,6 +4,7 @@
 #include <SpriteInstance.h>
 #include <Window.h>
 
+#include <array>
 #include <memory>
 
 class Application
@@ -40,6 +41,7 @@ private:
     Sprite mGameOver;
 
 	SpriteInstance mBirdInstance;
+    std::array<SpriteInstance, 4> mPipeInstances;
 
 
     static std::unique_ptr<Application> mInstance;
