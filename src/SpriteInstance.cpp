@@ -4,6 +4,9 @@ void SpriteInstance::Initialize(const Sprite* sprite)
 {
     mSprite = sprite;
     mFrame = 0;
+    mPosition = { 0.0f, 0.0f };
+    mFlipX = false;
+    mFlipY = false;
     mTime = mSprite->GetFrameTime();
 }
 
@@ -23,5 +26,5 @@ void SpriteInstance::Update(float deltaTime)
 
 void SpriteInstance::Render(Renderer& renderer)
 {
-    mSprite->RenderFrame(renderer, mX, mY, mFrame, mFlipX, mFlipY);
+    mSprite->RenderFrame(renderer, mPosition.x, mPosition.y, mFrame, mFlipX, mFlipY);
 }

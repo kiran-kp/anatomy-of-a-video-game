@@ -7,6 +7,7 @@
 #include <array>
 #include <memory>
 
+
 class Application
 {
 public:
@@ -40,8 +41,12 @@ private:
     Sprite mBase;
     Sprite mGameOver;
 
-	SpriteInstance mBirdInstance;
+    static constexpr float Gravity = 0.0025f;
+    float mBirdYVelocity;
+    SpriteInstance mBirdInstance;
+
     std::array<SpriteInstance, 4> mPipeInstances;
+    std::array<SpriteInstance, 2> mBaseInstances;
 
 
     static std::unique_ptr<Application> mInstance;

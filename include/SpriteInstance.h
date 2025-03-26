@@ -2,6 +2,13 @@
 
 #include <Sprite.h>
 
+struct Vec2
+{
+    float x;
+    float y;
+};
+
+
 class SpriteInstance
 {
 public:
@@ -12,13 +19,13 @@ public:
     void Update(float deltaTime);
     void Render(Renderer& renderer);
 
-    void SetPosition(float x, float y) { mX = x; mY = y; }
+    Vec2 GetPosition() const { return mPosition; }
+    void SetPosition(Vec2 pos) { mPosition = pos; }
     void SetFlip(bool flipX, bool flipY) { mFlipX = flipX; mFlipY = flipY; }
 
 private:
     const Sprite* mSprite;
-    float mX;
-    float mY;
+    Vec2 mPosition;
     bool mFlipX;
     bool mFlipY;
     size_t mFrame;

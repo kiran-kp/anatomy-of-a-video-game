@@ -10,6 +10,13 @@
 #include <vector>
 #include <unordered_map>
 
+constexpr float BasePos = 512.0f - 112.0f;
+
+float Clamp(float x, float minVal, float maxVal)
+{
+    return max(min(x, maxVal), minVal);
+}
+
 std::unique_ptr<Application> Application::mInstance;
 
 struct Image
@@ -66,14 +73,24 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     }
 
     mInstance->mBirdInstance.Initialize(&mInstance->mBird);
+    mInstance->mBirdInstance.SetPosition({50.0f, 200.0f});
+    mInstance->mBirdYVelocity = 0.0f;
     int i = 0;
     bool flipped = false;
     for (auto& p : mInstance->mPipeInstances)
     {
         p.Initialize(&mInstance->mPipe);
-        p.SetPosition(i * mInstance->mPipe.GetWidth(), 20.0f);
+        p.SetPosition({ i * mInstance->mPipe.GetWidth(), 20.0f });
         p.SetFlip(false, flipped);
         flipped = !flipped;
+        i++;
+    }
+
+    i = 0;
+    for (auto& b : mInstance->mBaseInstances)
+    {
+        b.Initialize(&mInstance->mBase);
+        b.SetPosition({ i * mInstance->mBase.GetWidth(), BasePos });
         i++;
     }
 
@@ -102,41 +119,56 @@ void Application::Run()
     }
 }
 
-static float x = 50.0f;
-static float y = 50.0f;
-
-static float xDir = 1.0f;
-static float yDir = 1.0f;
-
 void Application::Update(float deltaTime)
 {
-    mBirdInstance.Update(deltaTime);
+    bool collided = false;
+    auto updateCollided = [&collided](bool hasCollided) { collided = collided || hasCollided; };
 
-    x += 100.0f * xDir * deltaTime / 1000.0f;
-    y += 100.0f * yDir * deltaTime / 1000.0f;
-
-    if ((x + mBird.GetWidth()) >= 288.0f || x <= 0.0f)
+    // Update player
     {
-        xDir *= -1.0f;
+        Vec2 pos = mBirdInstance.GetPosition();
+        pos.y += deltaTime * (mBirdYVelocity + (deltaTime * Gravity / 2));
+        mBirdYVelocity += deltaTime * Gravity;
+        float unclampedY = pos.y;
+        pos.y = Clamp(pos.y, 0.0f, BasePos - mBird.GetHeight());
+        updateCollided(unclampedY != pos.y);
+
+        mBirdInstance.SetPosition(pos);
+        mBirdInstance.Update(deltaTime);
     }
 
-    if ((y + mBird.GetHeight()) >= 512.0f || y <= 0.0f)
+    // Update base
     {
-        yDir *= -1.0f;
+        for (auto& b : mBaseInstances)
+        {
+            Vec2 pos = b.GetPosition();
+            pos.x -= 0.1f * deltaTime;
+            if (pos.x <= -mBase.GetWidth())
+            {
+                pos.x = mBase.GetWidth();
+            }
+
+            b.SetPosition(pos);
+        }
     }
-    mBirdInstance.SetPosition(x, y);
-    mBirdInstance.SetFlip(xDir < 0.0f, false);
-    mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 100, 100);
-    mRenderer.AddQuad(95.0f, 95.0f, 150.0f, 20.0f, DarkBlue);
+
+    mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 0, 0);
+    mRenderer.AddQuad(0.0f, 0.0f, 150.0f, 20.0f, DarkBlue);
 }
 
 void Application::Render()
 {
     mBackground.RenderFrame(mRenderer, 0.0f, 0.0f, 0);
+    mBase.RenderFrame(mRenderer, 0.0f, BasePos, 0);
 
     for (auto& p : mPipeInstances)
     {
         p.Render(mRenderer);
+    }
+
+    for (auto& b : mBaseInstances)
+    {
+        b.Render(mRenderer);
     }
 
     mBirdInstance.Render(mRenderer);
