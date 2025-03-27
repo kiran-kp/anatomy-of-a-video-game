@@ -6,6 +6,7 @@
 
 #include <array>
 #include <memory>
+#include <random>
 
 
 class Application
@@ -45,7 +46,9 @@ private:
     float mBirdYVelocity;
     SpriteInstance mBirdInstance;
 
-    std::array<SpriteInstance, 4> mPipeInstances;
+    std::random_device mRandomDevice;
+    std::mt19937 mRng;
+    std::array<SpriteInstance, 6> mPipeInstances;
     std::array<SpriteInstance, 2> mBaseInstances;
 
 

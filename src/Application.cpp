@@ -7,10 +7,11 @@
 #include <format>
 #include <string_view>
 #include <thread>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 constexpr float BasePos = 512.0f - 112.0f;
+constexpr float ScrollSpeed = 0.1f;
 
 float Clamp(float x, float minVal, float maxVal)
 {
@@ -30,6 +31,16 @@ Application::Application()
     : mWindow()
     , mRenderer()
     , mBackground()
+    , mBird()
+    , mPipe()
+    , mBase()
+    , mGameOver()
+    , mBirdYVelocity()
+    , mBirdInstance()
+    , mRandomDevice()
+    , mRng(mRandomDevice())
+    , mPipeInstances()
+    , mBaseInstances()
 {
 }
 
@@ -75,15 +86,41 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     mInstance->mBirdInstance.Initialize(&mInstance->mBird);
     mInstance->mBirdInstance.SetPosition({50.0f, 200.0f});
     mInstance->mBirdYVelocity = 0.0f;
+
     int i = 0;
-    bool flipped = false;
+    std::random_device rd;
+    std::mt19937 rng(rd());
+    bool shouldCombine = false;
     for (auto& p : mInstance->mPipeInstances)
     {
+        // 0 - top, 1 - bottom, 2 - both
+        std::uniform_int_distribution pipePosSelector(0, 2);
+        auto config = pipePosSelector(rng);
+
         p.Initialize(&mInstance->mPipe);
-        p.SetPosition({ i * mInstance->mPipe.GetWidth(), 20.0f });
+        Vec2 pos = { i * mInstance->mPipe.GetWidth(), -200.0f };
+        bool flipped = true;
+        if (shouldCombine)
+        {
+            shouldCombine = false;
+            pos.x -= mInstance->mPipe.GetWidth();
+            pos.y = (100.0f + mInstance->mWindow.GetHeight() - mInstance->mPipe.GetHeight());
+            flipped = false;
+        }
+        else if (config == 1)
+        {
+            pos.y = (100.0f + mInstance->mWindow.GetHeight() - mInstance->mPipe.GetHeight());
+            flipped = false;
+        }
+        else if (config == 2)
+        {
+            shouldCombine = true;
+        }
+
+        p.SetPosition(pos);
         p.SetFlip(false, flipped);
         flipped = !flipped;
-        i++;
+        i += 4;
     }
 
     i = 0;
@@ -121,6 +158,40 @@ void Application::Run()
 
 void Application::Update(float deltaTime)
 {
+    // Update base
+    {
+        for (auto& b : mBaseInstances)
+        {
+            Vec2 pos = b.GetPosition();
+            pos.x -= ScrollSpeed * deltaTime;
+            if (pos.x <= -mBase.GetWidth())
+            {
+                pos.x = mBase.GetWidth();
+            }
+
+            b.SetPosition(pos);
+        }
+    }
+
+    // Update pipes
+    {
+        for (auto& p : mPipeInstances)
+        {
+            Vec2 pos = p.GetPosition();
+            pos.x -= ScrollSpeed * deltaTime;
+            if (pos.x <= -mPipe.GetWidth())
+            {
+                pos.x = mPipeInstances.size() * mPipe.GetWidth() * 2;
+
+                std::uniform_real_distribution yDist(-50.0f, 50.0f);
+                pos.y += yDist(mRng);
+                pos.y = Clamp(pos.y, -(mPipe.GetHeight() / 2.0f), BasePos);
+            }
+
+            p.SetPosition(pos);
+        }
+    }
+
     bool collided = false;
     auto updateCollided = [&collided](bool hasCollided) { collided = collided || hasCollided; };
 
@@ -135,21 +206,6 @@ void Application::Update(float deltaTime)
 
         mBirdInstance.SetPosition(pos);
         mBirdInstance.Update(deltaTime);
-    }
-
-    // Update base
-    {
-        for (auto& b : mBaseInstances)
-        {
-            Vec2 pos = b.GetPosition();
-            pos.x -= 0.1f * deltaTime;
-            if (pos.x <= -mBase.GetWidth())
-            {
-                pos.x = mBase.GetWidth();
-            }
-
-            b.SetPosition(pos);
-        }
     }
 
     mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 0, 0);
