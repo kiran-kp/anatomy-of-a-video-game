@@ -9,7 +9,7 @@ public:
     ~Window();
 
     void Initialize(const wchar_t *title, int windowWidth, int windowHeight, HINSTANCE hInstance, int nCmdShow);
-    void Shutdown();
+    void Shutdown() const;
 
     bool ProcessMessages();
 

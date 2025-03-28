@@ -11,9 +11,8 @@
 #include <vector>
 
 constexpr float BasePos = 512.0f - 112.0f;
-constexpr float ScrollSpeed = 0.1f;
 
-float Clamp(float x, float minVal, float maxVal)
+static float Clamp(float x, float minVal, float maxVal)
 {
     return max(min(x, maxVal), minVal);
 }
@@ -36,6 +35,9 @@ Application::Application()
     , mBase()
     , mGameOver()
     , mBirdYVelocity()
+    , mKeydown(false)
+    , mScore(0.0f)
+    , mHiScore(0.0f)
     , mBirdInstance()
     , mRandomDevice()
     , mRng(mRandomDevice())
@@ -163,7 +165,7 @@ void Application::Update(float deltaTime)
         for (auto& b : mBaseInstances)
         {
             Vec2 pos = b.GetPosition();
-            pos.x -= ScrollSpeed * deltaTime;
+            pos.x -= mScrollSpeed * deltaTime;
             if (pos.x <= -mBase.GetWidth())
             {
                 pos.x = mBase.GetWidth();
@@ -178,7 +180,7 @@ void Application::Update(float deltaTime)
         for (auto& p : mPipeInstances)
         {
             Vec2 pos = p.GetPosition();
-            pos.x -= ScrollSpeed * deltaTime;
+            pos.x -= mScrollSpeed * deltaTime;
             if (pos.x <= -mPipe.GetWidth())
             {
                 pos.x = mPipeInstances.size() * mPipe.GetWidth() * 2;
@@ -189,6 +191,14 @@ void Application::Update(float deltaTime)
             }
 
             p.SetPosition(pos);
+            if (p.GetYFlipped())
+            {
+                AddDebugText(std::format("({},{})", static_cast<int>(pos.x), static_cast<int>(pos.y)), static_cast<int>(pos.x), static_cast<int>(pos.y) + static_cast<int>(mPipe.GetHeight()));
+            }
+            else
+            {
+                AddDebugText(std::format("({},{})", static_cast<int>(pos.x), static_cast<int>(pos.y)), static_cast<int>(pos.x), static_cast<int>(pos.y) - 16);
+            }
         }
     }
 
@@ -198,18 +208,43 @@ void Application::Update(float deltaTime)
     // Update player
     {
         Vec2 pos = mBirdInstance.GetPosition();
+        if (mKeydown)
+        {
+            mBirdYVelocity = -0.35f;
+        }
+
         pos.y += deltaTime * (mBirdYVelocity + (deltaTime * Gravity / 2));
         mBirdYVelocity += deltaTime * Gravity;
         float unclampedY = pos.y;
         pos.y = Clamp(pos.y, 0.0f, BasePos - mBird.GetHeight());
-        updateCollided(unclampedY != pos.y);
+        //updateCollided(unclampedY != pos.y);
+
+        for (const auto& p : mPipeInstances)
+        {
+            auto pipePos = p.GetPosition();
+            if (pipePos.x > (50.0f - mPipe.GetWidth()))
+            {
+                auto top = pipePos.y;
+                auto bottom = pipePos.y + mPipe.GetHeight();
+                if ((pipePos.x <= pos.x + mBird.GetWidth()) && (pos.y > top) && (pos.y < bottom))
+                {
+                    collided = true;
+                    mHiScore = max(mScore, mHiScore);
+                    mScore = 0.0f;
+                }
+            }
+        }
 
         mBirdInstance.SetPosition(pos);
         mBirdInstance.Update(deltaTime);
+
+        AddDebugText(std::format("({},{})", static_cast<int>(pos.x), static_cast<int>(pos.y)), static_cast<int>(pos.x), static_cast<int>(pos.y) - 16);
     }
 
-    mRenderer.AddDebugText(std::format("Frame time: {:.4}", deltaTime), 0, 0);
-    mRenderer.AddQuad(0.0f, 0.0f, 150.0f, 20.0f, DarkBlue);
+    mScore += deltaTime / 1000.0f;
+    AddText(std::format("Frame time: {:.4}", deltaTime), 0, 0);
+    AddText(std::format("Hi Score: {:.2}", mHiScore), 0, 16);
+    AddText(std::format("Score: {}", mScore), 0, 32);
 }
 
 void Application::Render()
@@ -232,10 +267,26 @@ void Application::Render()
     mRenderer.Render();
 }
 
+void Application::AddDebugText(std::string_view txt, int x, int y)
+{
+#if 0
+    mRenderer.AddDebugText(txt, x, y);
+    mRenderer.AddQuad(static_cast<float>(x), static_cast<float>(y), static_cast<float>(txt.size() * 8), 16.0f, DarkBlue);
+#endif
+}
+
+void Application::AddText(std::string_view txt, int x, int y)
+{
+    mRenderer.AddDebugText(txt, x, y);
+    mRenderer.AddQuad(static_cast<float>(x), static_cast<float>(y), static_cast<float>(txt.size() * 8), 16.0f, DarkBlue);
+}
+
 void Application::KeyDown()
 {
+    mKeydown = true;
 }
 
 void Application::KeyUp()
 {
+    mKeydown = false;
 }

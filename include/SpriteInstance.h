@@ -22,6 +22,7 @@ public:
     Vec2 GetPosition() const { return mPosition; }
     void SetPosition(Vec2 pos) { mPosition = pos; }
     void SetFlip(bool flipX, bool flipY) { mFlipX = flipX; mFlipY = flipY; }
+    bool GetYFlipped() const { return mFlipY; }
 
 private:
     const Sprite* mSprite;

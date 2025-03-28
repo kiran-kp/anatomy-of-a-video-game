@@ -33,6 +33,9 @@ private:
     void Update(float deltaTime);
     void Render();
 
+    void AddDebugText(std::string_view, int x, int y);
+    void AddText(std::string_view, int x, int y);
+
     Window mWindow;
     Renderer mRenderer;
 
@@ -43,7 +46,12 @@ private:
     Sprite mGameOver;
 
     static constexpr float Gravity = 0.0025f;
+    float mScrollSpeed = 0.1f;
+
     float mBirdYVelocity;
+    bool mKeydown;
+    float mScore;
+    float mHiScore;
     SpriteInstance mBirdInstance;
 
     std::random_device mRandomDevice;

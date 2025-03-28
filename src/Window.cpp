@@ -11,7 +11,7 @@ Window::~Window()
 {
 }
 
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
@@ -20,12 +20,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         PostQuitMessage(0);
         return 0;
     }
-    case WM_MBUTTONDOWN:
+    case WM_LBUTTONDOWN:
     {
+        Application::Instance().KeyDown();
         return 0;
     }
-    case WM_MBUTTONUP:
+    case WM_LBUTTONUP:
     {
+        Application::Instance().KeyUp();
         return 0;
     }
     default:
@@ -66,7 +68,7 @@ void Window::Initialize(const wchar_t* title, int windowWidth, int windowHeight,
     ShowWindow(mHwnd, nCmdShow);
 }
 
-void Window::Shutdown()
+void Window::Shutdown() const
 {
     DestroyWindow(mHwnd);
 }
