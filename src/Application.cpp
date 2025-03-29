@@ -29,6 +29,12 @@ struct Image
 Application::Application()
     : mWindow()
     , mRenderer()
+    , mAudio()
+    , mDie()
+    , mHit()
+    , mPoint()
+    , mSwoosh()
+    , mWing()
     , mBackground()
     , mBird()
     , mPipe()
@@ -59,7 +65,7 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
             LOGGER_FLUSH();
             std::this_thread::sleep_for(10ms);
         }
-    });
+        });
 
     log_thread.detach();
 
@@ -68,8 +74,23 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     LOG("Initialized Window");
     mInstance->mRenderer.Initialize(mInstance->mWindow);
     LOG("Initialized Renderer");
+    mInstance->mAudio.Initialize();
+    LOG("Initialized Audio");
 
-    std::vector<std::pair<Sprite*, Image>> images = {
+    std::pair<Audio::Ref*, std::string_view> sounds[] = {
+        { &mInstance->mDie, "assets/audio/die.wav" },
+        { &mInstance->mHit, "assets/audio/hit.wav" },
+        { &mInstance->mPoint, "assets/audio/point.wav" },
+        { &mInstance->mSwoosh, "assets/audio/swoosh.wav" },
+        { &mInstance->mWing, "assets/audio/wing.wav" },
+    };
+
+    for (auto& [ref, path] : sounds)
+    {
+        *ref = mInstance->mAudio.LoadSound(path);
+    }
+
+    std::pair<Sprite*, Image> images[] = {
         { &mInstance->mBird, { "assets/sprites/bluebird-downflap.png", 34.0f, 24.0f } },
         { &mInstance->mBird, { "assets/sprites/bluebird-midflap.png", 34.0f, 24.0f } },
         { &mInstance->mBird, { "assets/sprites/bluebird-upflap.png", 34.0f, 24.0f } },
@@ -86,7 +107,7 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     }
 
     mInstance->mBirdInstance.Initialize(&mInstance->mBird);
-    mInstance->mBirdInstance.SetPosition({50.0f, 200.0f});
+    mInstance->mBirdInstance.SetPosition({ 50.0f, 200.0f });
     mInstance->mBirdYVelocity = 0.0f;
 
     int i = 0;
@@ -211,6 +232,7 @@ void Application::Update(float deltaTime)
         if (mKeydown)
         {
             mBirdYVelocity = -0.35f;
+            mAudio.Play(mWing);
         }
 
         pos.y += deltaTime * (mBirdYVelocity + (deltaTime * Gravity / 2));
@@ -231,6 +253,7 @@ void Application::Update(float deltaTime)
                     collided = true;
                     mHiScore = max(mScore, mHiScore);
                     mScore = 0.0f;
+                    mAudio.Play(mDie);
                 }
             }
         }
@@ -241,7 +264,13 @@ void Application::Update(float deltaTime)
         AddDebugText(std::format("({},{})", static_cast<int>(pos.x), static_cast<int>(pos.y)), static_cast<int>(pos.x), static_cast<int>(pos.y) - 16);
     }
 
+    float oldScore = mScore;
     mScore += deltaTime / 1000.0f;
+    if (oldScore < mHiScore && mScore > mHiScore)
+    {
+        mAudio.Play(mPoint);
+    }
+
     AddText(std::format("Frame time: {:.4}", deltaTime), 0, 0);
     AddText(std::format("Hi Score: {:.2}", mHiScore), 0, 16);
     AddText(std::format("Score: {}", mScore), 0, 32);
@@ -260,7 +289,7 @@ void Application::Render()
     for (auto& b : mBaseInstances)
     {
         b.Render(mRenderer);
-    }
+}
 
     mBirdInstance.Render(mRenderer);
 

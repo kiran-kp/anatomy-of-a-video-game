@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Audio.h>
 #include <Renderer.h>
 #include <SpriteInstance.h>
 #include <Window.h>
@@ -38,6 +39,13 @@ private:
 
     Window mWindow;
     Renderer mRenderer;
+    Audio mAudio;
+
+    Audio::Ref mDie;
+    Audio::Ref mHit;
+    Audio::Ref mPoint;
+    Audio::Ref mSwoosh;
+    Audio::Ref mWing;
 
     Sprite mBackground;
     Sprite mBird;
