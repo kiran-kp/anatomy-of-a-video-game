@@ -185,8 +185,9 @@ void Application::Run()
 
 void Application::Update(float deltaTime)
 {
+    const bool isAlive = mDeadTimer <= 0.0f;
     // Update base
-    if (mDeadTimer <= 0.0f)
+    if (isAlive)
     {
         for (auto& b : mBaseInstances)
         {
@@ -232,7 +233,7 @@ void Application::Update(float deltaTime)
     // Update player
     {
         Vec2 pos = mBirdInstance.GetPosition();
-        if (mDeadTimer <= 0.0f)
+        if (isAlive)
         {
             if (mKeydown)
             {
@@ -288,7 +289,7 @@ void Application::Update(float deltaTime)
         auto updateCollided = [&collided](bool hasCollided) { collided = collided || hasCollided; };
 
         {
-            if (mPlaying || mDeadTimer > 0.0f)
+            if (mPlaying || !isAlive)
             {
                 pos.y += deltaTime * (mBirdYVelocity + (deltaTime * Gravity / 2));
                 mBirdYVelocity += deltaTime * Gravity;
@@ -323,7 +324,7 @@ void Application::Update(float deltaTime)
         }
 
         mBirdInstance.SetPosition(pos);
-        if (mDeadTimer <= 0.0f)
+        if (isAlive)
         {
             mBirdInstance.Update(deltaTime);
         }
@@ -336,6 +337,10 @@ void Application::Update(float deltaTime)
         float oldScore = mScore;
         mScore += deltaTime / 1000.0f;
         if (oldScore < mHiScore && mScore > mHiScore)
+        {
+            mAudio.Play(mSwoosh);
+        }
+        else if (mScore > 1.0f && (static_cast<int>(mScore) % 10) == 0)
         {
             mAudio.Play(mPoint);
         }
