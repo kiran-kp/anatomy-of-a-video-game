@@ -54,10 +54,12 @@ private:
     Sprite mGameOver;
 
     static constexpr float Gravity = 0.0025f;
-    float mScrollSpeed = 0.1f;
 
+    float mScrollSpeed;
     float mBirdYVelocity;
     bool mKeydown;
+    float mDeadTimer;
+    bool mPlaying;
     float mScore;
     float mHiScore;
     SpriteInstance mBirdInstance;

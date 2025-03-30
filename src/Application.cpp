@@ -11,6 +11,7 @@
 #include <vector>
 
 constexpr float BasePos = 512.0f - 112.0f;
+constexpr float GameScrollSpeed = 0.1f;
 
 static float Clamp(float x, float minVal, float maxVal)
 {
@@ -40,8 +41,11 @@ Application::Application()
     , mPipe()
     , mBase()
     , mGameOver()
+    , mScrollSpeed(GameScrollSpeed)
     , mBirdYVelocity()
     , mKeydown(false)
+    , mDeadTimer(0.0f)
+    , mPlaying(false)
     , mScore(0.0f)
     , mHiScore(0.0f)
     , mBirdInstance()
@@ -110,7 +114,7 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     mInstance->mBirdInstance.SetPosition({ 50.0f, 200.0f });
     mInstance->mBirdYVelocity = 0.0f;
 
-    int i = 0;
+    int i = 6;
     std::random_device rd;
     std::mt19937 rng(rd());
     bool shouldCombine = false;
@@ -182,6 +186,7 @@ void Application::Run()
 void Application::Update(float deltaTime)
 {
     // Update base
+    if (mDeadTimer <= 0.0f)
     {
         for (auto& b : mBaseInstances)
         {
@@ -197,6 +202,7 @@ void Application::Update(float deltaTime)
     }
 
     // Update pipes
+    if (mPlaying)
     {
         for (auto& p : mPipeInstances)
         {
@@ -223,57 +229,121 @@ void Application::Update(float deltaTime)
         }
     }
 
-    bool collided = false;
-    auto updateCollided = [&collided](bool hasCollided) { collided = collided || hasCollided; };
-
     // Update player
     {
         Vec2 pos = mBirdInstance.GetPosition();
-        if (mKeydown)
+        if (mDeadTimer <= 0.0f)
         {
-            mBirdYVelocity = -0.35f;
-            mAudio.Play(mWing);
-        }
-
-        pos.y += deltaTime * (mBirdYVelocity + (deltaTime * Gravity / 2));
-        mBirdYVelocity += deltaTime * Gravity;
-        float unclampedY = pos.y;
-        pos.y = Clamp(pos.y, 0.0f, BasePos - mBird.GetHeight());
-        //updateCollided(unclampedY != pos.y);
-
-        for (const auto& p : mPipeInstances)
-        {
-            auto pipePos = p.GetPosition();
-            if (pipePos.x > (50.0f - mPipe.GetWidth()))
+            if (mKeydown)
             {
-                auto top = pipePos.y;
-                auto bottom = pipePos.y + mPipe.GetHeight();
-                if ((pipePos.x <= pos.x + mBird.GetWidth()) && (pos.y > top) && (pos.y < bottom))
+                mBirdYVelocity = -0.35f;
+                mAudio.Play(mWing);
+                mPlaying = true;
+            }
+        }
+        else
+        {
+            mDeadTimer -= deltaTime;
+            if (mDeadTimer <= 0.0f)
+            {
+                pos = { 50.0f, 200.0f };
+                int i = 6;
+                std::random_device rd;
+                std::mt19937 rng(rd());
+                bool shouldCombine = false;
+                for (auto& p : mInstance->mPipeInstances)
                 {
-                    collided = true;
-                    mHiScore = max(mScore, mHiScore);
-                    mScore = 0.0f;
-                    mAudio.Play(mDie);
+                    // 0 - top, 1 - bottom, 2 - both
+                    std::uniform_int_distribution pipePosSelector(0, 2);
+                    auto config = pipePosSelector(rng);
+
+                    Vec2 pos = { i * mPipe.GetWidth(), -200.0f };
+                    bool flipped = true;
+                    if (shouldCombine)
+                    {
+                        shouldCombine = false;
+                        pos.x -= mPipe.GetWidth();
+                        pos.y = (100.0f + mWindow.GetHeight() - mPipe.GetHeight());
+                        flipped = false;
+                    }
+                    else if (config == 1)
+                    {
+                        pos.y = (100.0f + mWindow.GetHeight() - mPipe.GetHeight());
+                        flipped = false;
+                    }
+                    else if (config == 2)
+                    {
+                        shouldCombine = true;
+                    }
+
+                    p.SetPosition(pos);
+                    p.SetFlip(false, flipped);
+                    flipped = !flipped;
+                    i += 4;
                 }
             }
         }
 
+        bool collided = false;
+        auto updateCollided = [&collided](bool hasCollided) { collided = collided || hasCollided; };
+
+        {
+            if (mPlaying || mDeadTimer > 0.0f)
+            {
+                pos.y += deltaTime * (mBirdYVelocity + (deltaTime * Gravity / 2));
+                mBirdYVelocity += deltaTime * Gravity;
+                float unclampedY = pos.y;
+                pos.y = Clamp(pos.y, 0.0f, BasePos - mBird.GetHeight());
+                //updateCollided(unclampedY != pos.y);
+            }
+
+            for (const auto& p : mPipeInstances)
+            {
+                auto pipePos = p.GetPosition();
+                if (pipePos.x > (50.0f - mPipe.GetWidth()))
+                {
+                    auto top = pipePos.y;
+                    auto bottom = pipePos.y + mPipe.GetHeight();
+                    if ((pipePos.x <= pos.x + mBird.GetWidth()) && (pos.y > top) && (pos.y < bottom))
+                    {
+                        collided = true;
+                        break;
+                    }
+                }
+            }
+
+            if (mPlaying && collided)
+            {
+                mHiScore = max(mScore, mHiScore);
+                mScore = 0.0f;
+                mAudio.Play(mDie);
+                mDeadTimer = 5000.0f;
+                mPlaying = false;
+            }
+        }
+
         mBirdInstance.SetPosition(pos);
-        mBirdInstance.Update(deltaTime);
+        if (mDeadTimer <= 0.0f)
+        {
+            mBirdInstance.Update(deltaTime);
+        }
 
         AddDebugText(std::format("({},{})", static_cast<int>(pos.x), static_cast<int>(pos.y)), static_cast<int>(pos.x), static_cast<int>(pos.y) - 16);
     }
 
-    float oldScore = mScore;
-    mScore += deltaTime / 1000.0f;
-    if (oldScore < mHiScore && mScore > mHiScore)
+    if (mPlaying)
     {
-        mAudio.Play(mPoint);
+        float oldScore = mScore;
+        mScore += deltaTime / 1000.0f;
+        if (oldScore < mHiScore && mScore > mHiScore)
+        {
+            mAudio.Play(mPoint);
+        }
     }
 
     AddText(std::format("Frame time: {:.4}", deltaTime), 0, 0);
-    AddText(std::format("Hi Score: {:.2}", mHiScore), 0, 16);
-    AddText(std::format("Score: {}", mScore), 0, 32);
+    AddText(std::format("Hi Score: {:.2f}", mHiScore), 0, 16);
+    AddText(std::format("Score: {:.2f}", mScore), 0, 32);
 }
 
 void Application::Render()
