@@ -60,6 +60,45 @@ Application::~Application()
 {
 }
 
+static void ResetPipes(std::array<SpriteInstance, 6>& pipes, Sprite* pipeSprite, const uint32_t windowHeight)
+{
+    size_t i = 6;
+    static std::random_device rd;
+    static std::mt19937 rng(rd());
+    bool shouldCombine = false;
+    for (auto& p : pipes)
+    {
+        // 0 - top, 1 - bottom, 2 - both
+        std::uniform_int_distribution pipePosSelector(0, 2);
+        auto config = pipePosSelector(rng);
+
+        p.Initialize(pipeSprite);
+        Vec2 pos = { i * pipeSprite->GetWidth(), -200.0f };
+        bool flipped = true;
+        if (shouldCombine)
+        {
+            shouldCombine = false;
+            pos.x -= pipeSprite->GetWidth();
+            pos.y = (100.0f + windowHeight - pipeSprite->GetHeight());
+            flipped = false;
+        }
+        else if (config == 1)
+        {
+            pos.y = (100.0f + windowHeight - pipeSprite->GetHeight());
+            flipped = false;
+        }
+        else if (config == 2)
+        {
+            shouldCombine = true;
+        }
+
+        p.SetPosition(pos);
+        p.SetFlip(false, flipped);
+        flipped = !flipped;
+        i += 4;
+    }
+}
+
 void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
 {
     auto log_thread = std::thread([]() {
@@ -114,47 +153,13 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     mInstance->mBirdInstance.SetPosition({ 50.0f, 200.0f });
     mInstance->mBirdYVelocity = 0.0f;
 
-    int i = 6;
-    std::random_device rd;
-    std::mt19937 rng(rd());
-    bool shouldCombine = false;
-    for (auto& p : mInstance->mPipeInstances)
-    {
-        // 0 - top, 1 - bottom, 2 - both
-        std::uniform_int_distribution pipePosSelector(0, 2);
-        auto config = pipePosSelector(rng);
+    ResetPipes(mInstance->mPipeInstances, &mInstance->mPipe, mInstance->mWindow.GetHeight());
 
-        p.Initialize(&mInstance->mPipe);
-        Vec2 pos = { i * mInstance->mPipe.GetWidth(), -200.0f };
-        bool flipped = true;
-        if (shouldCombine)
-        {
-            shouldCombine = false;
-            pos.x -= mInstance->mPipe.GetWidth();
-            pos.y = (100.0f + mInstance->mWindow.GetHeight() - mInstance->mPipe.GetHeight());
-            flipped = false;
-        }
-        else if (config == 1)
-        {
-            pos.y = (100.0f + mInstance->mWindow.GetHeight() - mInstance->mPipe.GetHeight());
-            flipped = false;
-        }
-        else if (config == 2)
-        {
-            shouldCombine = true;
-        }
-
-        p.SetPosition(pos);
-        p.SetFlip(false, flipped);
-        flipped = !flipped;
-        i += 4;
-    }
-
-    i = 0;
+    size_t i = 0;
     for (auto& b : mInstance->mBaseInstances)
     {
         b.Initialize(&mInstance->mBase);
-        b.SetPosition({ i * mInstance->mBase.GetWidth(), BasePos });
+        b.SetPosition({ i * mInstance->mBase.GetWidth() + i, BasePos});
         i++;
     }
 
@@ -248,40 +253,7 @@ void Application::Update(float deltaTime)
             if (mDeadTimer <= 0.0f)
             {
                 pos = { 50.0f, 200.0f };
-                int i = 6;
-                std::random_device rd;
-                std::mt19937 rng(rd());
-                bool shouldCombine = false;
-                for (auto& p : mInstance->mPipeInstances)
-                {
-                    // 0 - top, 1 - bottom, 2 - both
-                    std::uniform_int_distribution pipePosSelector(0, 2);
-                    auto config = pipePosSelector(rng);
-
-                    Vec2 pos = { i * mPipe.GetWidth(), -200.0f };
-                    bool flipped = true;
-                    if (shouldCombine)
-                    {
-                        shouldCombine = false;
-                        pos.x -= mPipe.GetWidth();
-                        pos.y = (100.0f + mWindow.GetHeight() - mPipe.GetHeight());
-                        flipped = false;
-                    }
-                    else if (config == 1)
-                    {
-                        pos.y = (100.0f + mWindow.GetHeight() - mPipe.GetHeight());
-                        flipped = false;
-                    }
-                    else if (config == 2)
-                    {
-                        shouldCombine = true;
-                    }
-
-                    p.SetPosition(pos);
-                    p.SetFlip(false, flipped);
-                    flipped = !flipped;
-                    i += 4;
-                }
+                ResetPipes(mPipeInstances, &mPipe, mWindow.GetHeight());
             }
         }
 
@@ -364,7 +336,7 @@ void Application::Render()
     for (auto& b : mBaseInstances)
     {
         b.Render(mRenderer);
-}
+    }
 
     mBirdInstance.Render(mRenderer);
 
