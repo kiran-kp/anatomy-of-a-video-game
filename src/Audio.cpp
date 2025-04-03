@@ -17,12 +17,12 @@ public:
     void OnStreamEnd() {}
 
     //Unused methods are stubs
-    void OnVoiceProcessingPassEnd() {}
-    void OnVoiceProcessingPassStart(UINT32 SamplesRequired) {}
-    void OnBufferEnd(void* pBufferContext);
-    void OnBufferStart(void* pBufferContext) {}
-    void OnLoopEnd(void* pBufferContext) {}
-    void OnVoiceError(void* pBufferContext, HRESULT Error) {}
+    void OnVoiceProcessingPassEnd() noexcept {}
+    void OnVoiceProcessingPassStart(UINT32 SamplesRequired) noexcept {}
+    void OnBufferEnd(void* pBufferContext) noexcept ;
+    void OnBufferStart(void* pBufferContext) noexcept {}
+    void OnLoopEnd(void* pBufferContext) noexcept {}
+    void OnVoiceError(void* pBufferContext, HRESULT Error) noexcept {}
 };
 
 struct Sound
@@ -44,7 +44,7 @@ struct Impl
 
 static_assert(sizeof(Impl) == sizeof(Audio::mImpl));
 
-void VoiceCallback::OnBufferEnd(void* pBufferContext)
+void VoiceCallback::OnBufferEnd(void* pBufferContext) noexcept
 {
     Sound* snd = reinterpret_cast<Sound*>(pBufferContext);
     snd->sourceVoice->Stop();
