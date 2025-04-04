@@ -1728,7 +1728,7 @@ void Renderer::Initialize(Window& window)
     mImpl.reset(new RendererImpl());
     mImpl->CreateDevice();
     mImpl->CreateCommandQueue();
-    mImpl->CreateSwapChain(window.GetHandle(), window.GetWidth(), window.GetHeight());
+    mImpl->CreateSwapChain(window.GetHandle(), window.GetWidth() / 2, window.GetHeight() / 2);
     mImpl->CreateCommandList();
     mImpl->CreateDescriptorHeaps();
     mImpl->CreateFence();

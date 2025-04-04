@@ -113,7 +113,7 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
     log_thread.detach();
 
     mInstance.reset(new Application());
-    mInstance->mWindow.Initialize(L"Bird Game", 288, 512, hInstance, nCmdShow);
+    mInstance->mWindow.Initialize(L"Bird Game", 288 * 2, 512 * 2, hInstance, nCmdShow);
     LOG("Initialized Window");
     mInstance->mRenderer.Initialize(mInstance->mWindow);
     LOG("Initialized Renderer");
@@ -190,7 +190,7 @@ void Application::Run()
 
 void Application::Update(float deltaTime)
 {
-    const bool isAlive = mDeadTimer <= 0.0f;
+    bool isAlive = mDeadTimer <= 0.0f;
     // Update base
     if (isAlive)
     {
@@ -253,6 +253,8 @@ void Application::Update(float deltaTime)
             if (mDeadTimer <= 0.0f)
             {
                 pos = { 50.0f, 200.0f };
+                mPlaying = false;
+                isAlive = true;
                 ResetPipes(mPipeInstances, &mPipe, mWindow.GetHeight());
             }
         }
@@ -345,7 +347,7 @@ void Application::Render()
 
 void Application::AddDebugText(std::string_view txt, int x, int y)
 {
-#if 0
+#if 1
     mRenderer.AddDebugText(txt, x, y);
     mRenderer.AddQuad(static_cast<float>(x), static_cast<float>(y), static_cast<float>(txt.size() * 8), 16.0f, DarkBlue);
 #endif
