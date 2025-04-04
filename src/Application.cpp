@@ -7,8 +7,6 @@
 #include <format>
 #include <string_view>
 #include <thread>
-#include <unordered_map>
-#include <vector>
 
 constexpr float BasePos = 512.0f - 112.0f;
 constexpr float GameScrollSpeed = 0.1f;
