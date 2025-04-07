@@ -1,13 +1,7 @@
 #pragma once
 
+#include <Common.h>
 #include <Sprite.h>
-
-struct Vec2
-{
-    float x;
-    float y;
-};
-
 
 class SpriteInstance
 {
