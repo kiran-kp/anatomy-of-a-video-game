@@ -6,7 +6,6 @@
 #include <chrono>
 #include <format>
 #include <string_view>
-#include <thread>
 
 constexpr float BasePos = 512.0f - 112.0f;
 constexpr float GameScrollSpeed = 0.1f;
@@ -15,7 +14,7 @@ Application* Application::sInstance = nullptr;
 
 static float Clamp(float x, float minVal, float maxVal)
 {
-    return max(min(x, maxVal), minVal);
+    return std::max(std::min(x, maxVal), minVal);
 }
 
 struct Image
@@ -64,9 +63,8 @@ static void ResetPipes(std::array<SpriteInstance, 6>& pipes, Sprite* pipeSprite,
     }
 }
 
-Application::Application(Arena* arena, HINSTANCE hInstance, int nCmdShow)
+Application::Application(Arena* arena, void* platformData)
     : mArena(arena)
-    , mWindow()
     , mRenderer()
     , mAudio()
     , mDie()
@@ -93,22 +91,9 @@ Application::Application(Arena* arena, HINSTANCE hInstance, int nCmdShow)
     , mBaseInstances()
 
 {
-    auto log_thread = std::thread([]() {
-        using namespace std::chrono_literals;
-        while (true)
-        {
-            LOGGER_FLUSH();
-            std::this_thread::sleep_for(10ms);
-        }
-        });
-
-    log_thread.detach();
-
     sInstance = this;
 
-    mWindow.Initialize(L"Bird Game", 288 * 2, 512 * 2, hInstance, nCmdShow);
-    LOG("Initialized Window");
-    mRenderer.Initialize(mWindow);
+    mRenderer.Initialize(platformData);
     LOG("Initialized Renderer");
     mAudio.Initialize();
     LOG("Initialized Audio");
@@ -146,7 +131,7 @@ Application::Application(Arena* arena, HINSTANCE hInstance, int nCmdShow)
     mBirdInstance.SetPosition({ 50.0f, 200.0f });
     mBirdYVelocity = 0.0f;
 
-    ResetPipes(mPipeInstances, &mPipe, mWindow.GetHeight());
+    ResetPipes(mPipeInstances, &mPipe, WindowHeight);
 
     size_t i = 0;
     for (auto& b : mBaseInstances)
@@ -168,21 +153,6 @@ Application::~Application()
 Application* Application::Instance()
 {
     return sInstance;
-}
-
-void Application::Run()
-{
-    std::chrono::high_resolution_clock::time_point lastFrameTime(std::chrono::high_resolution_clock::now());
-
-    while (mWindow.ProcessMessages())
-    {
-        const auto now = std::chrono::high_resolution_clock::now();
-        const auto deltaTime = std::chrono::duration<float, std::milli>(now - lastFrameTime).count();
-        lastFrameTime = now;
-
-        Update(deltaTime);
-        Render();
-    }
 }
 
 void Application::Update(float deltaTime)
@@ -252,7 +222,7 @@ void Application::Update(float deltaTime)
                 pos = { 50.0f, 200.0f };
                 mPlaying = false;
                 isAlive = true;
-                ResetPipes(mPipeInstances, &mPipe, mWindow.GetHeight());
+                ResetPipes(mPipeInstances, &mPipe, WindowHeight);
             }
         }
 
@@ -286,7 +256,7 @@ void Application::Update(float deltaTime)
 
             if (mPlaying && collided)
             {
-                mHiScore = max(mScore, mHiScore);
+                mHiScore = std::max(mScore, mHiScore);
                 mScore = 0.0f;
                 mAudio.Play(mDie);
                 mDeadTimer = 5000.0f;

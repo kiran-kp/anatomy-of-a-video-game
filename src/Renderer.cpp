@@ -1,8 +1,7 @@
-#include <Renderer.h>
+#include <Common.h>
 #include <Log.h>
+#include <Renderer.h>
 #include <Util.h>
-#include <Window.h>
-
 
 #include <WICTextureLoader12.h>
 // Hack: Just include the source for this here to avoid having to set up a project just statically compile this
@@ -1723,12 +1722,12 @@ Renderer::Renderer() = default;
 
 Renderer::~Renderer() = default;
 
-void Renderer::Initialize(Window& window)
+void Renderer::Initialize(void* platformData)
 {
     mImpl.reset(new RendererImpl());
     mImpl->CreateDevice();
     mImpl->CreateCommandQueue();
-    mImpl->CreateSwapChain(window.GetHandle(), window.GetWidth() / 2, window.GetHeight() / 2);
+    mImpl->CreateSwapChain(*reinterpret_cast<HWND*>(platformData), WindowWidth / 2, WindowHeight / 2);
     mImpl->CreateCommandList();
     mImpl->CreateDescriptorHeaps();
     mImpl->CreateFence();

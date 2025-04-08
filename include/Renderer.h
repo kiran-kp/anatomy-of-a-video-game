@@ -3,7 +3,6 @@
 #include <memory>
 #include <string_view>
 
-class Window;
 class RendererImpl;
 
 struct TextureRef
@@ -31,7 +30,7 @@ public:
     Renderer();
     ~Renderer();
 
-    void Initialize(Window& window);
+    void Initialize(void* platformData);
     void FinishUploadingTextures();
     void Shutdown();
 

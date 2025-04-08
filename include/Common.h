@@ -3,6 +3,9 @@
 #include <bit>
 #include <cstdint>
 
+constexpr uint32_t WindowWidth = 288 * 2;
+constexpr uint32_t WindowHeight = 512 * 2;
+
 struct Vec2
 {
     float x;

@@ -4,7 +4,6 @@
 #include <Common.h>
 #include <Renderer.h>
 #include <SpriteInstance.h>
-#include <Window.h>
 
 #include <array>
 #include <memory>
@@ -13,12 +12,13 @@
 class Application
 {
 public:
-    Application(Arena* arena, HINSTANCE hInstance, int nCmdShow);
+    Application(Arena* arena, void* platformData);
     ~Application();
 
     static Application* Instance();
 
-    void Run();
+    void Update(float deltaTime);
+    void Render();
 
     // Events that are triggered from the Windows message loop
     void KeyDown();
@@ -28,15 +28,11 @@ private:
     Application() = delete;
     Application(const Application&) = delete;
 
-    void Update(float deltaTime);
-    void Render();
-
     void AddDebugText(std::string_view, int x, int y);
     void AddText(std::string_view, int x, int y);
 
     Arena* mArena;
 
-    Window mWindow;
     Renderer mRenderer;
     Audio mAudio;
 
