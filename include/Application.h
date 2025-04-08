@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Audio.h>
+#include <Common.h>
 #include <Renderer.h>
 #include <SpriteInstance.h>
 #include <Window.h>
@@ -9,16 +10,13 @@
 #include <memory>
 #include <random>
 
-
 class Application
 {
 public:
+    Application(Arena* arena, HINSTANCE hInstance, int nCmdShow);
     ~Application();
 
-    // Be explicit about the initialization and destruction of singletons so that their lifetimes are known.
-    // We don't care about shutting down the Application class because it is only supposed to get destroyed when the program exits.
-    static void Initialize(HINSTANCE hInstance, int nCmdShow);
-    static Application& Instance();
+    static Application* Instance();
 
     void Run();
 
@@ -27,8 +25,7 @@ public:
     void KeyUp();
 
 private:
-    // The constructors are private/deleted to prevent instantiation of the singleton outside of the Initialize function.
-    Application();
+    Application() = delete;
     Application(const Application&) = delete;
 
     void Update(float deltaTime);
@@ -36,6 +33,8 @@ private:
 
     void AddDebugText(std::string_view, int x, int y);
     void AddText(std::string_view, int x, int y);
+
+    Arena* mArena;
 
     Window mWindow;
     Renderer mRenderer;
@@ -69,6 +68,5 @@ private:
     std::array<SpriteInstance, 6> mPipeInstances;
     std::array<SpriteInstance, 2> mBaseInstances;
 
-
-    static std::unique_ptr<Application> mInstance;
+    static Application* sInstance;
 };

@@ -22,12 +22,12 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
     }
     case WM_LBUTTONDOWN:
     {
-        Application::Instance().KeyDown();
+        Application::Instance()->KeyDown();
         return 0;
     }
     case WM_LBUTTONUP:
     {
-        Application::Instance().KeyUp();
+        Application::Instance()->KeyUp();
         return 0;
     }
     default:

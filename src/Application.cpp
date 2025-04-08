@@ -11,52 +11,19 @@
 constexpr float BasePos = 512.0f - 112.0f;
 constexpr float GameScrollSpeed = 0.1f;
 
+Application* Application::sInstance = nullptr;
+
 static float Clamp(float x, float minVal, float maxVal)
 {
     return max(min(x, maxVal), minVal);
 }
 
-std::unique_ptr<Application> Application::mInstance;
-
 struct Image
 {
-    std::string path;
+    std::string_view path;
     float width;
     float height;
 };
-
-Application::Application()
-    : mWindow()
-    , mRenderer()
-    , mAudio()
-    , mDie()
-    , mHit()
-    , mPoint()
-    , mSwoosh()
-    , mWing()
-    , mBackground()
-    , mBird()
-    , mPipe()
-    , mBase()
-    , mGameOver()
-    , mScrollSpeed(GameScrollSpeed)
-    , mBirdYVelocity()
-    , mKeydown(false)
-    , mDeadTimer(0.0f)
-    , mPlaying(false)
-    , mScore(0.0f)
-    , mHiScore(0.0f)
-    , mBirdInstance()
-    , mRandomDevice()
-    , mRng(mRandomDevice())
-    , mPipeInstances()
-    , mBaseInstances()
-{
-}
-
-Application::~Application()
-{
-}
 
 static void ResetPipes(std::array<SpriteInstance, 6>& pipes, Sprite* pipeSprite, const uint32_t windowHeight)
 {
@@ -97,7 +64,34 @@ static void ResetPipes(std::array<SpriteInstance, 6>& pipes, Sprite* pipeSprite,
     }
 }
 
-void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
+Application::Application(Arena* arena, HINSTANCE hInstance, int nCmdShow)
+    : mArena(arena)
+    , mWindow()
+    , mRenderer()
+    , mAudio()
+    , mDie()
+    , mHit()
+    , mPoint()
+    , mSwoosh()
+    , mWing()
+    , mBackground()
+    , mBird()
+    , mPipe()
+    , mBase()
+    , mGameOver()
+    , mScrollSpeed(GameScrollSpeed)
+    , mBirdYVelocity()
+    , mKeydown(false)
+    , mDeadTimer(0.0f)
+    , mPlaying(false)
+    , mScore(0.0f)
+    , mHiScore(0.0f)
+    , mBirdInstance()
+    , mRandomDevice()
+    , mRng(mRandomDevice())
+    , mPipeInstances()
+    , mBaseInstances()
+
 {
     auto log_thread = std::thread([]() {
         using namespace std::chrono_literals;
@@ -110,65 +104,70 @@ void Application::Initialize(HINSTANCE hInstance, int nCmdShow)
 
     log_thread.detach();
 
-    mInstance.reset(new Application());
-    mInstance->mWindow.Initialize(L"Bird Game", 288 * 2, 512 * 2, hInstance, nCmdShow);
+    sInstance = this;
+
+    mWindow.Initialize(L"Bird Game", 288 * 2, 512 * 2, hInstance, nCmdShow);
     LOG("Initialized Window");
-    mInstance->mRenderer.Initialize(mInstance->mWindow);
+    mRenderer.Initialize(mWindow);
     LOG("Initialized Renderer");
-    mInstance->mAudio.Initialize();
+    mAudio.Initialize();
     LOG("Initialized Audio");
 
     std::pair<Audio::Ref*, std::string_view> sounds[] = {
-        { &mInstance->mDie, "assets/audio/die.wav" },
-        { &mInstance->mHit, "assets/audio/hit.wav" },
-        { &mInstance->mPoint, "assets/audio/point.wav" },
-        { &mInstance->mSwoosh, "assets/audio/swoosh.wav" },
-        { &mInstance->mWing, "assets/audio/wing.wav" },
+        { &mDie, "assets/audio/die.wav" },
+        { &mHit, "assets/audio/hit.wav" },
+        { &mPoint, "assets/audio/point.wav" },
+        { &mSwoosh, "assets/audio/swoosh.wav" },
+        { &mWing, "assets/audio/wing.wav" },
     };
 
     for (auto& [ref, path] : sounds)
     {
-        *ref = mInstance->mAudio.LoadSound(path);
+        *ref = mAudio.LoadSound(path);
     }
 
     std::pair<Sprite*, Image> images[] = {
-        { &mInstance->mBird, { "assets/sprites/bluebird-downflap.png", 34.0f, 24.0f } },
-        { &mInstance->mBird, { "assets/sprites/bluebird-midflap.png", 34.0f, 24.0f } },
-        { &mInstance->mBird, { "assets/sprites/bluebird-upflap.png", 34.0f, 24.0f } },
-        { &mInstance->mBackground, { "assets/sprites/background-night.png", 288.0f, 512.0f } },
-        { &mInstance->mPipe, { "assets/sprites/pipe-green.png", 52.0f, 320.0f } },
-        { &mInstance->mBase, { "assets/sprites/base.png", 336.0f, 112.0f } },
-        { &mInstance->mGameOver, { "assets/sprites/gameover.png", 192.0f, 42.0f } }
+        { &mBird, { "assets/sprites/bluebird-downflap.png", 34.0f, 24.0f } },
+        { &mBird, { "assets/sprites/bluebird-midflap.png", 34.0f, 24.0f } },
+        { &mBird, { "assets/sprites/bluebird-upflap.png", 34.0f, 24.0f } },
+        { &mBackground, { "assets/sprites/background-night.png", 288.0f, 512.0f } },
+        { &mPipe, { "assets/sprites/pipe-green.png", 52.0f, 320.0f } },
+        { &mBase, { "assets/sprites/base.png", 336.0f, 112.0f } },
+        { &mGameOver, { "assets/sprites/gameover.png", 192.0f, 42.0f } }
     };
 
     for (auto& [sprite, image] : images)
     {
         sprite->Initialize(image.width, image.height, 160.0f);
-        sprite->AddTexture(mInstance->mRenderer.CreateTexture(image.path));
+        sprite->AddTexture(mRenderer.CreateTexture(image.path));
     }
 
-    mInstance->mBirdInstance.Initialize(&mInstance->mBird);
-    mInstance->mBirdInstance.SetPosition({ 50.0f, 200.0f });
-    mInstance->mBirdYVelocity = 0.0f;
+    mBirdInstance.Initialize(&mBird);
+    mBirdInstance.SetPosition({ 50.0f, 200.0f });
+    mBirdYVelocity = 0.0f;
 
-    ResetPipes(mInstance->mPipeInstances, &mInstance->mPipe, mInstance->mWindow.GetHeight());
+    ResetPipes(mPipeInstances, &mPipe, mWindow.GetHeight());
 
     size_t i = 0;
-    for (auto& b : mInstance->mBaseInstances)
+    for (auto& b : mBaseInstances)
     {
-        b.Initialize(&mInstance->mBase);
-        b.SetPosition({ i * mInstance->mBase.GetWidth() + i, BasePos});
+        b.Initialize(&mBase);
+        b.SetPosition({ i * mBase.GetWidth() + i, BasePos});
         i++;
     }
 
     LOG("Initialized Textures");
-    mInstance->mRenderer.FinishUploadingTextures();
+    mRenderer.FinishUploadingTextures();
     LOG("Uploaded textures to GPU");
 }
 
-Application& Application::Instance()
+Application::~Application()
 {
-    return *mInstance;
+}
+
+Application* Application::Instance()
+{
+    return sInstance;
 }
 
 void Application::Run()
