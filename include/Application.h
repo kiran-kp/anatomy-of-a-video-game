@@ -15,8 +15,6 @@ public:
     Application(Arena* arena, void* platformData);
     ~Application();
 
-    static Application* Instance();
-
     void Update(float deltaTime);
     void Render();
 

@@ -157,11 +157,6 @@ Application::~Application()
 {
 }
 
-Application* Application::Instance()
-{
-    return sInstance;
-}
-
 void Application::Update(float deltaTime)
 {
     bool isAlive = mDeadTimer <= 0.0f;
