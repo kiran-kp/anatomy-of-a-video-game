@@ -96,7 +96,7 @@ Application::Application(Arena* arena, void* platformData)
     mRenderer.Initialize(platformData);
     LOG("Initialized Renderer");
 
-    mAudio = reinterpret_cast<Audio*>(mArena->Push(sizeof(Audio)));
+    mAudio = mArena->Push<Audio>();
     auto audioArena = mArena->PushArena("ARENA_Audio", 1ll * 1024ll * 1024ll);
     mAudio->Initialize(audioArena);
     LOG("Initialized Audio");

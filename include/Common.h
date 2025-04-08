@@ -40,7 +40,14 @@ class Arena
 public:
     static Arena* Create(const char* name, uint8_t* backingMemory, size_t capacity);
 
+
     uint8_t* Push(size_t size, size_t alignment = 8);
+
+    template <typename T> T* Push()
+    {
+        uint8_t* memory = Push(sizeof(T), alignof(T));
+        return reinterpret_cast<T*>(memory);
+    }
 
     template <typename T> std::span<T> PushArray(size_t size)
     {

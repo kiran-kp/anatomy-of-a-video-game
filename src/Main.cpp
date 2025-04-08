@@ -82,7 +82,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     auto arena = Arena::Create("ARENA_Base", gameMemory, TotalGameMemory);
 
-    appInstance = reinterpret_cast<Application*>(arena->Push(sizeof(Application)));
+    appInstance = arena->Push<Application>();
 
     auto remainingSize = arena->GetCapacity() - arena->GetUsedSize() - 1ll;
     auto appArena = arena->PushArena("ARENA_App", remainingSize);

@@ -50,7 +50,7 @@ void VoiceCallback::OnBufferEnd(void* pBufferContext) noexcept
 void Audio::Initialize(Arena* arena)
 {
     mArena = arena;
-    auto impl = reinterpret_cast<Impl*>(mArena->Push(sizeof(Impl)));
+    auto impl = mArena->Push<Impl>();
     ensure(SUCCEEDED(::CoInitializeEx(nullptr, COINIT_MULTITHREADED)));
     ensure(SUCCEEDED(::XAudio2Create(&impl->xaudio2, 0, XAUDIO2_DEFAULT_PROCESSOR)));
     ensure(SUCCEEDED(impl->xaudio2->CreateMasteringVoice(&impl->masteringVoice)));
@@ -139,7 +139,7 @@ HRESULT ReadChunkData(HANDLE hFile, void* buffer, DWORD buffersize, DWORD buffer
 Audio::Ref Audio::LoadSound(std::string_view path)
 {
     Impl* impl = reinterpret_cast<Impl*>(mImpl);
-    auto snd = reinterpret_cast<Sound*>(mArena->Push(sizeof(Sound)));
+    auto snd = mArena->Push<Sound>();
     memset(snd, 0, sizeof(snd));
     new (snd) Sound();
 
@@ -171,11 +171,11 @@ Audio::Ref Audio::LoadSound(std::string_view path)
 
     //fill out the audio data buffer with the contents of the fourccDATA chunk
     FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
-    BYTE* pDataBuffer = mArena->Push(sizeof(BYTE) * dwChunkSize);
-    ReadChunkData(hFile, pDataBuffer, dwChunkSize, dwChunkPosition);
+    std::span<BYTE> dataBuffer = mArena->PushArray<BYTE>(dwChunkSize);
+    ReadChunkData(hFile, dataBuffer.data(), dwChunkSize, dwChunkPosition);
 
-    snd->buffer.AudioBytes = dwChunkSize;
-    snd->buffer.pAudioData = pDataBuffer;
+    snd->buffer.AudioBytes = static_cast<uint32_t>(dataBuffer.size());
+    snd->buffer.pAudioData = dataBuffer.data();
     snd->buffer.Flags = XAUDIO2_END_OF_STREAM;
     snd->buffer.pContext = snd;
 
