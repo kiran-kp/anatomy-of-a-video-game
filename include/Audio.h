@@ -1,29 +1,27 @@
 #pragma once
 
-#include <memory>
+#include <Common.h>
+
 #include <string_view>
+#include <cstdint>
 
 class Audio
 {
 public:
     struct Ref
     {
-        size_t id;
+        uintptr_t ptr;
     };
 
-    Audio();
-    ~Audio();
-
-    void Initialize();
+    void Initialize(Arena* arena);
 
     Ref LoadSound(std::string_view path);
     void Play(Ref sound);
 
 private:
-    struct alignas(8) implT
-    {
-        char data[624];
-    };
+    Audio() = delete;
+    ~Audio() = delete;
 
-    implT mImpl;
+    Arena* mArena;
+    uintptr_t mImpl;
 };

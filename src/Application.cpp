@@ -95,7 +95,10 @@ Application::Application(Arena* arena, void* platformData)
 
     mRenderer.Initialize(platformData);
     LOG("Initialized Renderer");
-    mAudio.Initialize();
+
+    mAudio = reinterpret_cast<Audio*>(mArena->Push(sizeof(Audio)));
+    auto audioArena = mArena->PushArena("ARENA_Audio", 32ll * 1024ll * 1024ll);
+    mAudio->Initialize(audioArena);
     LOG("Initialized Audio");
 
     std::pair<Audio::Ref*, std::string_view> sounds[] = {
@@ -108,7 +111,7 @@ Application::Application(Arena* arena, void* platformData)
 
     for (auto& [ref, path] : sounds)
     {
-        *ref = mAudio.LoadSound(path);
+        *ref = mAudio->LoadSound(path);
     }
 
     std::pair<Sprite*, Image> images[] = {
@@ -210,7 +213,7 @@ void Application::Update(float deltaTime)
             if (mKeydown)
             {
                 mBirdYVelocity = -0.35f;
-                mAudio.Play(mWing);
+                mAudio->Play(mWing);
                 mPlaying = true;
             }
         }
@@ -258,7 +261,7 @@ void Application::Update(float deltaTime)
             {
                 mHiScore = std::max(mScore, mHiScore);
                 mScore = 0.0f;
-                mAudio.Play(mDie);
+                mAudio->Play(mDie);
                 mDeadTimer = 5000.0f;
                 mPlaying = false;
             }
@@ -279,11 +282,11 @@ void Application::Update(float deltaTime)
         mScore += deltaTime / 1000.0f;
         if (oldScore < mHiScore && mScore > mHiScore)
         {
-            mAudio.Play(mSwoosh);
+            mAudio->Play(mSwoosh);
         }
         else if (mScore > 1.0f && (static_cast<int>(mScore) % 10) == 0)
         {
-            mAudio.Play(mPoint);
+            mAudio->Play(mPoint);
         }
     }
 

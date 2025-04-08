@@ -38,11 +38,7 @@ struct Impl
 {
     IXAudio2* xaudio2;
     IXAudio2MasteringVoice* masteringVoice;
-    size_t numSounds;
-    Sound sounds[5];
 };
-
-static_assert(sizeof(Impl) == sizeof(Audio::mImpl));
 
 void VoiceCallback::OnBufferEnd(void* pBufferContext) noexcept
 {
@@ -51,16 +47,15 @@ void VoiceCallback::OnBufferEnd(void* pBufferContext) noexcept
     snd->playing = false;
 }
 
-Audio::Audio() = default;
-Audio::~Audio() = default;
-
-void Audio::Initialize()
+void Audio::Initialize(Arena* arena)
 {
-    Impl* impl = reinterpret_cast<Impl*>(&mImpl);
-    memset(impl, 0, sizeof(Impl));
+    mArena = arena;
+    auto impl = reinterpret_cast<Impl*>(mArena->Push(sizeof(Impl)));
     ensure(SUCCEEDED(::CoInitializeEx(nullptr, COINIT_MULTITHREADED)));
     ensure(SUCCEEDED(::XAudio2Create(&impl->xaudio2, 0, XAUDIO2_DEFAULT_PROCESSOR)));
     ensure(SUCCEEDED(impl->xaudio2->CreateMasteringVoice(&impl->masteringVoice)));
+
+    mImpl = reinterpret_cast<uintptr_t>(impl);
 }
 
 #define fourccRIFF 'FFIR'
@@ -143,15 +138,16 @@ HRESULT ReadChunkData(HANDLE hFile, void* buffer, DWORD buffersize, DWORD buffer
 
 Audio::Ref Audio::LoadSound(std::string_view path)
 {
-    Impl* impl = reinterpret_cast<Impl*>(&mImpl);
-    size_t index = impl->numSounds;
-    impl->numSounds += 1;
-    Sound& snd = impl->sounds[index];
-    memset(&snd, 0, sizeof(snd));
+    Impl* impl = reinterpret_cast<Impl*>(mImpl);
+    auto snd = reinterpret_cast<Sound*>(mArena->Push(sizeof(Sound)));
+    memset(snd, 0, sizeof(snd));
+    new (snd) Sound();
 
-    std::wstring wpath(std::begin(path), std::end(path));
+    wchar_t wpath[1024];
+    swprintf(wpath, 1024, L"%.*hs", static_cast<int>(path.size()), path.data());
+
     // Open the file
-    HANDLE hFile = CreateFile(wpath.c_str(),
+    HANDLE hFile = CreateFile(wpath,
                               GENERIC_READ,
                               FILE_SHARE_READ,
                               NULL,
@@ -171,33 +167,32 @@ Audio::Ref Audio::LoadSound(std::string_view path)
     ensure(filetype == fourccWAVE);
 
     FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
-    ReadChunkData(hFile, &snd.wfx , dwChunkSize, dwChunkPosition);
+    ReadChunkData(hFile, &snd->wfx , dwChunkSize, dwChunkPosition);
 
     //fill out the audio data buffer with the contents of the fourccDATA chunk
     FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
-    BYTE* pDataBuffer = new BYTE[dwChunkSize];
+    BYTE* pDataBuffer = mArena->Push(sizeof(BYTE) * dwChunkSize);
     ReadChunkData(hFile, pDataBuffer, dwChunkSize, dwChunkPosition);
 
-    snd.buffer.AudioBytes = dwChunkSize;
-    snd.buffer.pAudioData = pDataBuffer;
-    snd.buffer.Flags = XAUDIO2_END_OF_STREAM;
-    snd.buffer.pContext = &snd;
+    snd->buffer.AudioBytes = dwChunkSize;
+    snd->buffer.pAudioData = pDataBuffer;
+    snd->buffer.Flags = XAUDIO2_END_OF_STREAM;
+    snd->buffer.pContext = snd;
 
-    new (&snd.callback) VoiceCallback();
-    snd.callback.mSnd = &snd;
-    ensure(SUCCEEDED(impl->xaudio2->CreateSourceVoice(&snd.sourceVoice, (WAVEFORMATEX*)&snd.wfx, 0, 2.0f, &snd.callback)));
+    new (&snd->callback) VoiceCallback();
+    snd->callback.mSnd = snd;
+    ensure(SUCCEEDED(impl->xaudio2->CreateSourceVoice(&snd->sourceVoice, (WAVEFORMATEX*)&snd->wfx, 0, 2.0f, &snd->callback)));
 
-    return { index };
+    return { reinterpret_cast<uintptr_t>(snd) };
 }
 
 void Audio::Play(Audio::Ref sound)
 {
-    Impl* impl = reinterpret_cast<Impl*>(&mImpl);
-    Sound& snd = impl->sounds[sound.id];
-    if (!snd.playing)
+    Sound* snd = reinterpret_cast<Sound*>(sound.ptr);
+    if (!snd->playing)
     {
-        snd.playing = true;
-        ensure(SUCCEEDED(snd.sourceVoice->SubmitSourceBuffer(&snd.buffer)));
-        snd.sourceVoice->Start(0);
+        snd->playing = true;
+        ensure(SUCCEEDED(snd->sourceVoice->SubmitSourceBuffer(&snd->buffer)));
+        snd->sourceVoice->Start(0);
     }
 }

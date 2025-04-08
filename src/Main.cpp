@@ -46,6 +46,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     log_thread.detach();
 
+    LOG("Initialized Logger");
+
     // Initialize the window
     const wchar_t CLASS_NAME[] = L"BirdGame";
     WNDCLASS wc = {};
@@ -72,7 +74,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     SetWindowLong(hwnd, GWL_STYLE, GetWindowLong(hwnd, GWL_STYLE) & ~WS_SIZEBOX);
 
-    // Initialize the game
+    LOG("Initialized window");
+
     constexpr size_t TotalGameMemory = 128ll * 1024ll * 1024ll;
     auto gameMemory = reinterpret_cast<uint8_t*>(malloc(TotalGameMemory));
     memset(gameMemory, 0, TotalGameMemory);
@@ -86,6 +89,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     new (appInstance) Application(appArena, &hwnd);
 
+    LOG("Initialized Application");
+
+    LOG("Starting main loop");
     bool running = true;
     std::chrono::high_resolution_clock::time_point lastFrameTime(std::chrono::high_resolution_clock::now());
 

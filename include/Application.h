@@ -34,7 +34,7 @@ private:
     Arena* mArena;
 
     Renderer mRenderer;
-    Audio mAudio;
+    Audio* mAudio;
 
     Audio::Ref mDie;
     Audio::Ref mHit;
