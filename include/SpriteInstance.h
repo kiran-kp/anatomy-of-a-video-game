@@ -9,7 +9,7 @@ public:
     SpriteInstance() = default;
     ~SpriteInstance() = default;
 
-    void Initialize(const Sprite* sprite);
+    void Initialize(Sprite* sprite);
     void Update(float deltaTime);
     void Render(Renderer& renderer);
 
@@ -19,7 +19,7 @@ public:
     bool GetYFlipped() const { return mFlipY; }
 
 private:
-    const Sprite* mSprite;
+    Sprite* mSprite;
     Vec2 mPosition;
     bool mFlipX;
     bool mFlipY;

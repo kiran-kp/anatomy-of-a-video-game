@@ -1,6 +1,6 @@
 #include <SpriteInstance.h>
 
-void SpriteInstance::Initialize(const Sprite* sprite)
+void SpriteInstance::Initialize(Sprite* sprite)
 {
     mSprite = sprite;
     mFrame = 0;
@@ -19,7 +19,7 @@ void SpriteInstance::Update(float deltaTime)
         if (mTime <= 0.0f)
         {
             mTime = mSprite->GetFrameTime();
-            mFrame = (mFrame + 1) % mSprite->GetTextureCount();
+            mFrame = (mFrame + 1) % mSprite->GetFrameCount();
         }
     }
 }

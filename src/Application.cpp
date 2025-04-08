@@ -19,9 +19,9 @@ static float Clamp(float x, float minVal, float maxVal)
 
 struct Image
 {
-    std::string_view path;
     float width;
     float height;
+    std::initializer_list<std::string_view> paths;
 };
 
 static void ResetPipes(std::array<SpriteInstance, 6>& pipes, Sprite* pipeSprite, const uint32_t windowHeight)
@@ -97,7 +97,7 @@ Application::Application(Arena* arena, void* platformData)
     LOG("Initialized Renderer");
 
     mAudio = reinterpret_cast<Audio*>(mArena->Push(sizeof(Audio)));
-    auto audioArena = mArena->PushArena("ARENA_Audio", 32ll * 1024ll * 1024ll);
+    auto audioArena = mArena->PushArena("ARENA_Audio", 1ll * 1024ll * 1024ll);
     mAudio->Initialize(audioArena);
     LOG("Initialized Audio");
 
@@ -115,19 +115,23 @@ Application::Application(Arena* arena, void* platformData)
     }
 
     std::pair<Sprite*, Image> images[] = {
-        { &mBird, { "assets/sprites/bluebird-downflap.png", 34.0f, 24.0f } },
-        { &mBird, { "assets/sprites/bluebird-midflap.png", 34.0f, 24.0f } },
-        { &mBird, { "assets/sprites/bluebird-upflap.png", 34.0f, 24.0f } },
-        { &mBackground, { "assets/sprites/background-night.png", 288.0f, 512.0f } },
-        { &mPipe, { "assets/sprites/pipe-green.png", 52.0f, 320.0f } },
-        { &mBase, { "assets/sprites/base.png", 336.0f, 112.0f } },
-        { &mGameOver, { "assets/sprites/gameover.png", 192.0f, 42.0f } }
+        { &mBird, { 34.0f, 24.0f, { "assets/sprites/bluebird-downflap.png", "assets/sprites/bluebird-midflap.png", "assets/sprites/bluebird-upflap.png" } } },
+        { &mBackground, { 288.0f, 512.0f, { "assets/sprites/background-night.png" } } },
+        { &mPipe, { 52.0f, 320.0f, { "assets/sprites/pipe-green.png" } } },
+        { &mBase, { 336.0f, 112.0f, { "assets/sprites/base.png" } } },
+        { &mGameOver, { 192.0f, 42.0f, { "assets/sprites/gameover.png" } } }
     };
 
     for (auto& [sprite, image] : images)
     {
-        sprite->Initialize(image.width, image.height, 160.0f);
-        sprite->AddTexture(mRenderer.CreateTexture(image.path));
+        auto textures = mArena->PushArray<TextureRef>(image.paths.size());
+        for (size_t i = 0; auto& path : image.paths)
+        {
+            textures[i] = mRenderer.CreateTexture(path);
+            i++;
+        }
+
+        sprite->Initialize(image.width, image.height, textures, 160.0f);
     }
 
     mBirdInstance.Initialize(&mBird);

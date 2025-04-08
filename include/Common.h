@@ -2,6 +2,9 @@
 
 #include <bit>
 #include <cstdint>
+#include <span>
+
+#define ensure(x) if (!(x)) { int *y = 0; *y = 42; }
 
 constexpr uint32_t WindowWidth = 288 * 2;
 constexpr uint32_t WindowHeight = 512 * 2;
@@ -38,6 +41,13 @@ public:
     static Arena* Create(const char* name, uint8_t* backingMemory, size_t capacity);
 
     uint8_t* Push(size_t size, size_t alignment = 8);
+
+    template <typename T> std::span<T> PushArray(size_t size)
+    {
+        uint8_t* memory = Push(sizeof(T) * size);
+        return std::span(reinterpret_cast<T*>(memory), size);
+    }
+
     Arena* PushArena(const char* name, size_t capacity);
     void Clear();
 
@@ -48,7 +58,7 @@ private:
     Arena()  = default;
     ~Arena() = default;
 
-    char name[16];
+    char mName[16];
     uint8_t* mBase = nullptr;
     size_t mOffset = 0;
     size_t mCapacity = 0;

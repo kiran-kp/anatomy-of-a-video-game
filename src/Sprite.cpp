@@ -1,23 +1,17 @@
 #include <Sprite.h>
 
-#include <cassert>
-
-void Sprite::Initialize(float width, float height, float frameTime)
+void Sprite::Initialize(float width, float height, std::span<TextureRef> frames, float frameTime)
 {
     mWidth = width;
     mHeight = height;
     mFrameTime = frameTime;
+    mFrames = frames;
 }
 
-void Sprite::AddTexture(TextureRef texture)
+void Sprite::RenderFrame(Renderer& renderer, float x, float y, size_t frame, bool flipX, bool flipY)
 {
-    mTextures.push_back(texture);
-}
+    ensure(!mFrames.empty());
+    ensure(frame < mFrames.size());
 
-void Sprite::RenderFrame(Renderer& renderer, float x, float y, size_t frame, bool flipX, bool flipY) const
-{
-    assert(!mTextures.empty());
-    assert(frame < mTextures.size());
-
-    renderer.AddQuad(x, y, mWidth, mHeight, flipX, flipY, mTextures[frame]);
+    renderer.AddQuad(x, y, mWidth, mHeight, flipX, flipY, mFrames[frame]);
 }

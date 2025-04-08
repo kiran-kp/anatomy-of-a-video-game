@@ -4,7 +4,7 @@
 Arena* Arena::Create(const char* name, uint8_t* backingMemory, size_t capacity)
 {
     auto arena = reinterpret_cast<Arena*>(backingMemory);
-    strncpy_s(arena->name, 16, name, strlen(name));
+    strncpy_s(arena->mName, 16, name, strlen(name));
     arena->mBase = backingMemory;
     arena->mOffset = ArenaHeaderSize;
     arena->mCapacity = capacity;
