@@ -35,11 +35,12 @@ struct Rect
     };
 };
 
-class Arena
+struct Arena
 {
-public:
-    static Arena* Create(const char* name, uint8_t* backingMemory, size_t capacity);
+    Arena() = delete;
+    ~Arena() = delete;
 
+    static Arena* Create(const char* name, uint8_t* backingMemory, size_t capacity);
 
     uint8_t* Push(size_t size, size_t alignment = 8);
 
@@ -61,9 +62,8 @@ public:
     size_t GetUsedSize() const;
     size_t GetCapacity() const;
 
-private:
-    Arena()  = default;
-    ~Arena() = default;
+    static std::span<Arena*> sArenas;
+    static size_t sNumArenas;
 
     char mName[16];
     uint8_t* mBase = nullptr;

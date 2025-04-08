@@ -76,7 +76,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     LOG("Initialized window");
 
-    constexpr size_t TotalGameMemory = 128ll * 1024ll * 1024ll;
+    constexpr size_t TotalGameMemory = 64ll * 1024ll * 1024ll;
     auto gameMemory = reinterpret_cast<uint8_t*>(malloc(TotalGameMemory));
     memset(gameMemory, 0, TotalGameMemory);
 
@@ -114,6 +114,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         }
 
         appInstance->Update(deltaTime);
+        char buffer[1024];
+        for (size_t i = 0; i < Arena::sNumArenas; i++)
+        {
+            Arena* a = Arena::sArenas[i];
+            auto bufferEnd = std::format_to(buffer, "{}: {}kb/{}kb", a->mName, a->GetUsedSize() / 1024ll, a->GetCapacity() / 1024ll);
+            appInstance->AddDebugText(std::string_view(buffer, bufferEnd), 10, 100 + static_cast<int32_t>(i) * 16);
+        }
+
         appInstance->Render();
     }
 

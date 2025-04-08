@@ -22,11 +22,12 @@ public:
     void KeyDown();
     void KeyUp();
 
+    void AddDebugText(std::string_view, int x, int y);
+
 private:
     Application() = delete;
     Application(const Application&) = delete;
 
-    void AddDebugText(std::string_view, int x, int y);
     void AddText(std::string_view, int x, int y);
 
     Arena* mArena;

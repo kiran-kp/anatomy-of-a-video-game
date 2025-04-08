@@ -1,6 +1,9 @@
 #include <Common.h>
 #include <Util.h>
 
+std::span<Arena*> Arena::sArenas;
+size_t Arena::sNumArenas = 0;
+
 Arena* Arena::Create(const char* name, uint8_t* backingMemory, size_t capacity)
 {
     auto arena = reinterpret_cast<Arena*>(backingMemory);
@@ -8,6 +11,13 @@ Arena* Arena::Create(const char* name, uint8_t* backingMemory, size_t capacity)
     arena->mBase = backingMemory;
     arena->mOffset = ArenaHeaderSize;
     arena->mCapacity = capacity;
+
+    if (sNumArenas == 0)
+    {
+        sArenas = arena->PushArray<Arena*>(10);
+    }
+
+    sArenas[sNumArenas++] = arena;
 
     return arena;
 }
