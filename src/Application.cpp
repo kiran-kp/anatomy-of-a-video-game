@@ -63,35 +63,18 @@ static void ResetPipes(std::array<SpriteInstance, 6>& pipes, Sprite* pipeSprite,
     }
 }
 
-Application::Application(Arena* arena, void* platformData)
-    : mArena(arena)
-    , mRenderer()
-    , mAudio()
-    , mDie()
-    , mHit()
-    , mPoint()
-    , mSwoosh()
-    , mWing()
-    , mBackground()
-    , mBird()
-    , mPipe()
-    , mBase()
-    , mGameOver()
-    , mScrollSpeed(GameScrollSpeed)
-    , mBirdYVelocity()
-    , mKeydown(false)
-    , mDeadTimer(0.0f)
-    , mPlaying(false)
-    , mScore(0.0f)
-    , mHiScore(0.0f)
-    , mBirdInstance()
-    , mRandomDevice()
-    , mRng(mRandomDevice())
-    , mPipeInstances()
-    , mBaseInstances()
-
+void Application::Initialize(Arena* arena, void* platformData)
 {
     sInstance = this;
+    mArena = arena;
+    mScrollSpeed = GameScrollSpeed;
+    mKeydown = false;
+    mDeadTimer = 0.0f;
+    mPlaying = false;
+    mScore = 0.0f;
+    mHiScore = 0.0f;
+
+    mRng.seed(mRandomDevice());
 
     mRenderer.Initialize(platformData);
     LOG("Initialized Renderer");
@@ -151,10 +134,6 @@ Application::Application(Arena* arena, void* platformData)
     LOG("Initialized Textures");
     mRenderer.FinishUploadingTextures();
     LOG("Uploaded textures to GPU");
-}
-
-Application::~Application()
-{
 }
 
 void Application::Update(float deltaTime)

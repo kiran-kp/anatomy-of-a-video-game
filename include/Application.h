@@ -12,9 +12,7 @@
 class Application
 {
 public:
-    Application(Arena* arena, void* platformData);
-    ~Application();
-
+    void Initialize(Arena* arena, void* platformData);
     void Update(float deltaTime);
     void Render();
 
@@ -26,6 +24,7 @@ public:
 
 private:
     Application() = delete;
+    ~Application() = delete;
     Application(const Application&) = delete;
 
     void AddText(std::string_view, int x, int y);

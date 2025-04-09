@@ -76,7 +76,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     LOG("Initialized window");
 
-    constexpr size_t TotalGameMemory = 64ll * 1024ll * 1024ll;
+    constexpr size_t TotalGameMemory = 4ll * 1024ll * 1024ll;
     auto gameMemory = reinterpret_cast<uint8_t*>(malloc(TotalGameMemory));
     memset(gameMemory, 0, TotalGameMemory);
 
@@ -87,7 +87,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     auto remainingSize = arena->GetCapacity() - arena->GetUsedSize() - 1ll;
     auto appArena = arena->PushArena("ARENA_App", remainingSize);
 
-    new (appInstance) Application(appArena, &hwnd);
+    appInstance->Initialize(appArena, &hwnd);
 
     LOG("Initialized Application");
 
