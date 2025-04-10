@@ -999,11 +999,12 @@ void ColoredQuadRenderer::AddQuad(const float x, const float y, const float widt
 
 // ------------------------------------------------------------------------------------------------
 
-class RendererImpl
+struct Renderer::Impl
 {
-public:
-    RendererImpl() = default;
-    ~RendererImpl() = default;
+    Impl() = default;
+    ~Impl() = delete;
+
+    void Initialize(Arena* arena);
 
     void CreateDevice();
     void CreateCommandQueue();
@@ -1018,6 +1019,7 @@ public:
     void InitializeRenderers();
     void FinishUploadingTextures();
 
+    void BeginFrame();
     void PopulateCommandListAndSubmit();
     void Present();
     void WaitForPreviousFrame();
@@ -1036,7 +1038,9 @@ public:
                  const float height,
                  const Color& color);
 
-private:
+    Arena* mArena;
+    Arena* mFrameArena;
+
     ID3D12Device* mDevice;
     ID3D12CommandQueue* mCommandQueue;
     IDXGISwapChain3* mSwapChain;
@@ -1052,7 +1056,7 @@ private:
     ID3D12GraphicsCommandList* mCommandList;
 
     DescriptorHeap mSrvHeap;
-    std::vector<Texture> mTextures;
+    size_t mNumTextures = 0;
 
     TexturedQuadRenderer mTexturedQuadRenderer;
     TextRenderer mTextRenderer;
@@ -1064,7 +1068,13 @@ private:
     uint64_t mFenceValue;
 };
 
-void RendererImpl::CreateDevice()
+void Renderer::Impl::Initialize(Arena* arena)
+{
+    mArena = arena;
+    mFrameArena = arena->PushArena("ARENA_Frame", 1ll * 1024ll * 1024ll);
+}
+
+void Renderer::Impl::CreateDevice()
 {
     UINT dxgiFactoryFlags = 0;
 
@@ -1093,7 +1103,7 @@ void RendererImpl::CreateDevice()
     factory->Release();
 }
 
-void RendererImpl::CreateCommandQueue()
+void Renderer::Impl::CreateCommandQueue()
 {
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -1102,7 +1112,7 @@ void RendererImpl::CreateCommandQueue()
     ensure(SUCCEEDED(mDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue))));
 }
 
-void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
+void Renderer::Impl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
 {
     IDXGIFactory4* factory;
     ensure(SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))));
@@ -1160,7 +1170,7 @@ void RendererImpl::CreateSwapChain(HWND hwnd, uint32_t width, uint32_t height)
     mDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&mCommandAllocator));
 }
 
-void RendererImpl::CreateCommandList()
+void Renderer::Impl::CreateCommandList()
 {
     ensure(SUCCEEDED(mDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, mCommandAllocator, nullptr, IID_PPV_ARGS(&mCommandList))));
 
@@ -1168,13 +1178,13 @@ void RendererImpl::CreateCommandList()
     mCommandList->Close();
 }
 
-void RendererImpl::CreateDescriptorHeaps()
+void Renderer::Impl::CreateDescriptorHeaps()
 {
     mSrvHeap.Initialize(mDevice, static_cast<uint32_t>(NumSRVs));
 }
 
 // A fence is a synchronization primitive that we can use to signal that the GPU is done rendering a frame
-void RendererImpl::CreateFence()
+void Renderer::Impl::CreateFence()
 {
     ensure(SUCCEEDED(mDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence))));
     mFenceValue = 1;
@@ -1187,28 +1197,25 @@ void RendererImpl::CreateFence()
     }
 }
 
-TextureRef RendererImpl::CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data)
+TextureRef Renderer::Impl::CreateTexture(uint32_t width, uint32_t height, uint32_t pixelSize, const void* data)
 {
-    Texture texture;
-    texture.Initialize(mDevice, mCommandList, width, height, pixelSize, data);
-    size_t index = mTextures.size();
+    auto tex = mArena->Push<Texture>();
+    tex->Initialize(mDevice, mCommandList, width, height, pixelSize, data);
+    size_t index = mNumTextures++;
     assert(index < NumSRVs);
-    mTextures.push_back(std::move(texture));
-
-    mSrvHeap.CreateSRV(mDevice, texture, index);
-    return { index };
+    mSrvHeap.CreateSRV(mDevice, *tex, index);
+    return { reinterpret_cast<uintptr_t>(tex), index };
 }
 
-TextureRef RendererImpl::CreateTexture(const std::string_view path)
+TextureRef Renderer::Impl::CreateTexture(const std::string_view path)
 {
-    Texture texture;
-    texture.Initialize(mDevice, mCommandList, path);
-    size_t index = mTextures.size();
+    auto tex = mArena->Push<Texture>();
+    tex->Initialize(mDevice, mCommandList, path);
+    size_t index = mNumTextures++;
     assert(index < NumSRVs);
-    mTextures.push_back(std::move(texture));
 
-    mSrvHeap.CreateSRV(mDevice, texture, index);
-    return { index };
+    mSrvHeap.CreateSRV(mDevice, *tex, index);
+    return { reinterpret_cast<uintptr_t>(tex), index };
 }
 
 namespace
@@ -1250,7 +1257,7 @@ namespace
     }
 }
 
-void RendererImpl::InitializeRenderers()
+void Renderer::Impl::InitializeRenderers()
 {
     ensure(SUCCEEDED(mCommandList->Reset(mCommandAllocator, nullptr)));
 
@@ -1270,7 +1277,7 @@ void RendererImpl::InitializeRenderers()
     }
 }
 
-void RendererImpl::FinishUploadingTextures()
+void Renderer::Impl::FinishUploadingTextures()
 {
     // Close the command list and execute it to begin the initial GPU setup.
     ensure(SUCCEEDED(mCommandList->Close()));
@@ -1281,7 +1288,12 @@ void RendererImpl::FinishUploadingTextures()
     WaitForPreviousFrame();
 }
 
-void RendererImpl::PopulateCommandListAndSubmit()
+void Renderer::Impl::BeginFrame()
+{
+    mFrameArena->Clear();
+}
+
+void Renderer::Impl::PopulateCommandListAndSubmit()
 {
     // This should only be done after the command list associated with this allocator has finished execution.
     // Ensure that this is only called after WaitForPreviousFrame().
@@ -1321,12 +1333,12 @@ void RendererImpl::PopulateCommandListAndSubmit()
     mCommandQueue->ExecuteCommandLists(1, commandLists);
 }
 
-void RendererImpl::Present()
+void Renderer::Impl::Present()
 {
     ensure(SUCCEEDED(mSwapChain->Present(1, 0)));
 }
 
-void RendererImpl::WaitForPreviousFrame()
+void Renderer::Impl::WaitForPreviousFrame()
 {
     // TODO: This is apparently not a good way to queue up work for the GPU because we're doing nothing while we wait for the previous frame to render.
     // Look into the frame buffering sample
@@ -1346,12 +1358,12 @@ void RendererImpl::WaitForPreviousFrame()
     mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 }
 
-void RendererImpl::AddDebugText(const std::string_view text, const int32_t x, const int32_t y)
+void Renderer::Impl::AddDebugText(const std::string_view text, const int32_t x, const int32_t y)
 {
     mTextRenderer.AddDebugText(text, x, y);
 }
 
-void RendererImpl::AddQuad(const float x,
+void Renderer::Impl::AddQuad(const float x,
                            const float y,
                            const float width,
                            const float height,
@@ -1362,7 +1374,7 @@ void RendererImpl::AddQuad(const float x,
     mTexturedQuadRenderer.AddQuad(x, y, width, height, flipX, flipY, texture);
 }
 
-void RendererImpl::AddQuad(const float x,
+void Renderer::Impl::AddQuad(const float x,
                            const float y,
                            const float width,
                            const float height,
@@ -1378,9 +1390,11 @@ Renderer::Renderer() = default;
 
 Renderer::~Renderer() = default;
 
-void Renderer::Initialize(void* platformData)
+void Renderer::Initialize(Arena* arena, void* platformData)
 {
-    mImpl.reset(new RendererImpl());
+    mImpl = arena->Push<Impl>();
+    new (mImpl) Impl();
+    mImpl->Initialize(arena);
     mImpl->CreateDevice();
     mImpl->CreateCommandQueue();
     mImpl->CreateSwapChain(*reinterpret_cast<HWND*>(platformData), WindowWidth / 2, WindowHeight / 2);
@@ -1398,6 +1412,11 @@ void Renderer::FinishUploadingTextures()
 
 void Renderer::Shutdown()
 {
+}
+
+void Renderer::BeginFrame()
+{
+    mImpl->BeginFrame();
 }
 
 void Renderer::Render()

@@ -31,7 +31,7 @@ private:
 
     Arena* mArena;
 
-    Renderer mRenderer;
+    Renderer* mRenderer;
     Audio* mAudio;
 
     Audio::Ref mDie;
@@ -45,8 +45,6 @@ private:
     Sprite mPipe;
     Sprite mBase;
     Sprite mGameOver;
-
-    static constexpr float Gravity = 0.0025f;
 
     float mScrollSpeed;
     float mBirdYVelocity;

@@ -11,7 +11,7 @@ public:
 
     void Initialize(Sprite* sprite);
     void Update(float deltaTime);
-    void Render(Renderer& renderer);
+    void Render(Renderer* renderer);
 
     Vec2 GetPosition() const { return mPosition; }
     void SetPosition(Vec2 pos) { mPosition = pos; }

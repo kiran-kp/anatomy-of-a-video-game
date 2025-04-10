@@ -14,7 +14,7 @@ public:
     void Initialize(float width, float height, std::span<TextureRef> frames, float frameTime = 0.0f);
     void AddTexture(TextureRef texture);
 
-    void RenderFrame(Renderer& renderer, float x, float y, size_t frame, bool flipX = false, bool flipY = false);
+    void RenderFrame(Renderer* renderer, float x, float y, size_t frame, bool flipX = false, bool flipY = false);
 
     float GetWidth() const { return mWidth; }
     float GetHeight() const { return mHeight; }

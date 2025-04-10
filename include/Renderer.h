@@ -3,10 +3,9 @@
 #include <memory>
 #include <string_view>
 
-class RendererImpl;
-
 struct TextureRef
 {
+    uintptr_t ref;
     size_t index;
 };
 
@@ -30,10 +29,11 @@ public:
     Renderer();
     ~Renderer();
 
-    void Initialize(void* platformData);
+    void Initialize(Arena* arena, void* platformData);
     void FinishUploadingTextures();
     void Shutdown();
 
+    void BeginFrame();
     void Render();
 
     void AddDebugText(const std::string_view text, const int32_t x, const int32_t y);
@@ -53,5 +53,6 @@ public:
                  const Color& color);
 
 private:
-    std::unique_ptr<RendererImpl> mImpl;
+    struct Impl;
+    Impl* mImpl;
 };

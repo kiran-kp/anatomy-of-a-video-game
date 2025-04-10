@@ -24,7 +24,7 @@ void SpriteInstance::Update(float deltaTime)
     }
 }
 
-void SpriteInstance::Render(Renderer& renderer)
+void SpriteInstance::Render(Renderer* renderer)
 {
     mSprite->RenderFrame(renderer, mPosition.x, mPosition.y, mFrame, mFlipX, mFlipY);
 }

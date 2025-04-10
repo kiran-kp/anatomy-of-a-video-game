@@ -9,6 +9,7 @@
 
 constexpr float BasePos = 512.0f - 112.0f;
 constexpr float GameScrollSpeed = 0.1f;
+constexpr float Gravity = 0.0025f;
 
 Application* Application::sInstance = nullptr;
 
@@ -76,7 +77,9 @@ void Application::Initialize(Arena* arena, void* platformData)
 
     mRng.seed(mRandomDevice());
 
-    mRenderer.Initialize(platformData);
+    mRenderer = mArena->Push<Renderer>();
+    auto rendererArena = mArena->PushArena("Arena_Render", 20ll * 1024ll * 1024ll);
+    mRenderer->Initialize(rendererArena, platformData);
     LOG("Initialized Renderer");
 
     mAudio = mArena->Push<Audio>();
@@ -110,7 +113,7 @@ void Application::Initialize(Arena* arena, void* platformData)
         auto textures = mArena->PushArray<TextureRef>(image.paths.size());
         for (size_t i = 0; auto& path : image.paths)
         {
-            textures[i] = mRenderer.CreateTexture(path);
+            textures[i] = mRenderer->CreateTexture(path);
             i++;
         }
 
@@ -132,7 +135,7 @@ void Application::Initialize(Arena* arena, void* platformData)
     }
 
     LOG("Initialized Textures");
-    mRenderer.FinishUploadingTextures();
+    mRenderer->FinishUploadingTextures();
     LOG("Uploaded textures to GPU");
 }
 
@@ -290,21 +293,23 @@ void Application::Render()
 
     mBirdInstance.Render(mRenderer);
 
-    mRenderer.Render();
+    mRenderer->Render();
+
+    mRenderer->BeginFrame();
 }
 
 void Application::AddDebugText(std::string_view txt, int x, int y)
 {
 #if 1
-    mRenderer.AddDebugText(txt, x, y);
-    mRenderer.AddQuad(static_cast<float>(x), static_cast<float>(y), static_cast<float>(txt.size() * 8), 16.0f, DarkBlue);
+    mRenderer->AddDebugText(txt, x, y);
+    mRenderer->AddQuad(static_cast<float>(x), static_cast<float>(y), static_cast<float>(txt.size() * 8), 16.0f, DarkBlue);
 #endif
 }
 
 void Application::AddText(std::string_view txt, int x, int y)
 {
-    mRenderer.AddDebugText(txt, x, y);
-    mRenderer.AddQuad(static_cast<float>(x), static_cast<float>(y), static_cast<float>(txt.size() * 8), 16.0f, DarkBlue);
+    mRenderer->AddDebugText(txt, x, y);
+    mRenderer->AddQuad(static_cast<float>(x), static_cast<float>(y), static_cast<float>(txt.size() * 8), 16.0f, DarkBlue);
 }
 
 void Application::KeyDown()
