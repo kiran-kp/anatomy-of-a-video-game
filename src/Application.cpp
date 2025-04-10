@@ -78,7 +78,7 @@ void Application::Initialize(Arena* arena, void* platformData)
     mRng.seed(mRandomDevice());
 
     mRenderer = mArena->Push<Renderer>();
-    auto rendererArena = mArena->PushArena("Arena_Render", 20ll * 1024ll * 1024ll);
+    auto rendererArena = mArena->PushArena("Arena_Render", 2ll * 1024ll * 1024ll);
     mRenderer->Initialize(rendererArena, platformData);
     LOG("Initialized Renderer");
 

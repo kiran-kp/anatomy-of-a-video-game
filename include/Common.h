@@ -35,6 +35,40 @@ struct Rect
     };
 };
 
+template <typename T>
+struct Buffer
+{
+    std::span<T> mMemory;
+    size_t mSize = 0;
+
+    std::span<T> Get()
+    {
+        return std::span(mMemory.data(), mSize);
+    }
+
+    void PushBack(T value)
+    {
+        ensure(mSize < mMemory.size());
+        mMemory[mSize] = value;
+        mSize += 1;
+    }
+
+    void Clear()
+    {
+        mSize = 0;
+    }
+
+    T* Data()
+    {
+        return mMemory.data();
+    }
+
+    size_t Size()
+    {
+        return mSize;
+    }
+};
+
 struct Arena
 {
     Arena() = delete;
@@ -54,6 +88,12 @@ struct Arena
     {
         uint8_t* memory = Push(sizeof(T) * size);
         return std::span(reinterpret_cast<T*>(memory), size);
+    }
+
+    template <typename T> Buffer<T> PushBuffer(size_t size)
+    {
+        uint8_t* memory = Push(sizeof(T) * size);
+        return { std::span(reinterpret_cast<T*>(memory), size), 0 };
     }
 
     Arena* PushArena(const char* name, size_t capacity);

@@ -197,7 +197,7 @@ public:
     TextRenderer() = default;
     ~TextRenderer();
 
-    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef font);
+    void Initialize(Arena* arena, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef font);
     void Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap);
     void AddDebugText(const std::string_view text, const int32_t x, const int32_t y);
 
@@ -231,8 +231,8 @@ private:
         size_t length;
     };
 
-    std::vector<char> mStrings;
-    std::vector<StringRefs> mStringRefs;
+    Buffer<char> mStrings;
+    Buffer<StringRefs> mStringRefs;
 }; 
 
 TextRenderer::~TextRenderer()
@@ -384,9 +384,10 @@ namespace Font
         {0x00,0x00,0x32,0x4C,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}
     }};
 
-    std::vector<uint8_t> GenerateTextureData()
+    std::span<uint8_t> GenerateTextureData(Arena* arena)
     {
-        std::vector<uint8_t> data(TextureWidth * TextureHeight * TexturePixelSize, 0);
+        auto data = arena->PushArray<uint8_t>(TextureWidth * TextureHeight * TexturePixelSize);
+        memset(data.data(), 0, data.size());
 
         // For each character in our font
         for (uint32_t charIndex = 0; charIndex < NumChars; ++charIndex)
@@ -421,8 +422,10 @@ namespace Font
     }
 }
 
-void TextRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef font)
+void TextRenderer::Initialize(Arena* arena, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight, TextureRef font)
 {
+    mStrings = arena->PushBuffer<char>(MaxCharacters);
+    mStringRefs = arena->PushBuffer<StringRefs>(MaxCharacters);
     mScreenWidth = screenWidth;
     mScreenHeight = screenHeight;
 
@@ -558,11 +561,11 @@ void TextRenderer::Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap
     const float charHeight = (Font::CharHeight / mScreenHeight) * 2.0f;
 
     uint32_t vertexCount = 0;
-    for (const auto& ref : mStringRefs)
+    for (const auto& ref : mStringRefs.Get())
     {
         float currentX = ((ref.x / mScreenWidth) * 2.0f) - 1.0f;
         float currentY = 1.0f - ((ref.y / mScreenHeight) * 2.0f);
-        const std::string_view text = std::string_view(mStrings.data() + ref.start, ref.length);
+        const std::string_view text = std::string_view(mStrings.Data() + ref.start, ref.length);
 
         for (char c : text)
         {
@@ -585,8 +588,8 @@ void TextRenderer::Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap
         }
     }
 
-    mStrings.clear();
-    mStringRefs.clear();
+    mStrings.Clear();
+    mStringRefs.Clear();
 
     mVertexBuffer->Unmap(0, nullptr);
 
@@ -604,10 +607,14 @@ void TextRenderer::Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap
 
 void TextRenderer::AddDebugText(const std::string_view text, const int32_t x, const int32_t y)
 {
-    ensure((mStrings.size() + text.size()) < MaxCharacters);
-    const size_t start = mStrings.size();
-    mStrings.insert(mStrings.end(), text.begin(), text.end());
-    mStringRefs.push_back({ x, y, start, text.size() });
+    ensure((mStrings.Size() + text.size()) < MaxCharacters);
+    const size_t start = mStrings.Size();
+    for (auto c : text)
+    {
+        mStrings.PushBack(c);
+    }
+
+    mStringRefs.PushBack({ x, y, start, text.size() });
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -618,7 +625,7 @@ public:
     TexturedQuadRenderer() = default;
     ~TexturedQuadRenderer() = default;
 
-    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
+    void Initialize(Arena* arena, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
     void Render(ID3D12GraphicsCommandList* commandList, DescriptorHeap& srvHeap);
 
     void AddQuad(const float x, const float y, const float width, const float height, const bool flipX, const bool flipY, const TextureRef texture);
@@ -655,11 +662,13 @@ private:
     CD3DX12_VIEWPORT mViewport;
     CD3DX12_RECT mScissorRect;
 
-    std::vector<Quad> mQuads;
+    Buffer<Quad> mQuads;
 };
 
-void TexturedQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight)
+void TexturedQuadRenderer::Initialize(Arena* arena, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight)
 {
+    mQuads = arena->PushBuffer<Quad>(MaxQuads);
+
     mScreenWidth = screenWidth;
     mScreenHeight = screenHeight;
 
@@ -772,7 +781,7 @@ void TexturedQuadRenderer::Render(ID3D12GraphicsCommandList* commandList, Descri
     CD3DX12_RANGE readRange(0, 0);
     ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
 
-    for (const Quad& q : mQuads)
+    for (const Quad& q : mQuads.Get())
     {
         // Convert screen coordinates to NDC
         // NDC_x = (2 * pixel_x / screen_width) - 1
@@ -810,20 +819,20 @@ void TexturedQuadRenderer::Render(ID3D12GraphicsCommandList* commandList, Descri
     commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
 
     UINT i = 0;
-    for (const Quad& q : mQuads)
+    for (const Quad& q : mQuads.Get())
     {
         commandList->SetGraphicsRootDescriptorTable(0, srvHeap.GetGPUHandle(q.texture.index));
         commandList->DrawInstanced(6, 1, i * 6, 0);
         i++;
     }
 
-    mQuads.clear();
+    mQuads.Clear();
 }
 
 void TexturedQuadRenderer::AddQuad(const float x, const float y, const float width, const float height, const bool flipX, const bool flipY, const TextureRef texture)
 {
-    ensure(mQuads.size() < MaxQuads);
-    mQuads.push_back({ x, y, width, height, flipX, flipY, texture });
+    ensure(mQuads.Size() < MaxQuads);
+    mQuads.PushBack({ x, y, width, height, flipX, flipY, texture });
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -834,7 +843,7 @@ public:
     ColoredQuadRenderer() = default;
     ~ColoredQuadRenderer() = default;
 
-    void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
+    void Initialize(Arena* arena, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight);
     void Render(ID3D12GraphicsCommandList* commandList);
 
     void AddQuad(const float x, const float y, const float width, const float height, const DirectX::XMFLOAT4& color);
@@ -869,11 +878,12 @@ private:
     CD3DX12_VIEWPORT mViewport;
     CD3DX12_RECT mScissorRect;
 
-    std::vector<Quad> mQuads;
+    Buffer<Quad> mQuads;
 };
 
-void ColoredQuadRenderer::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight)
+void ColoredQuadRenderer::Initialize(Arena* arena, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, float screenWidth, float screenHeight)
 {
+    mQuads = arena->PushBuffer<Quad>(MaxQuads);
     mScreenWidth = screenWidth;
     mScreenHeight = screenHeight;
 
@@ -955,7 +965,7 @@ void ColoredQuadRenderer::Render(ID3D12GraphicsCommandList* commandList)
     CD3DX12_RANGE readRange(0, 0);
     ensure(SUCCEEDED(mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin))));
 
-    for (const Quad& q : mQuads)
+    for (const Quad& q : mQuads.Get())
     {
         // Convert screen coordinates to NDC
         // NDC_x = (2 * pixel_x / screen_width) - 1
@@ -987,14 +997,14 @@ void ColoredQuadRenderer::Render(ID3D12GraphicsCommandList* commandList)
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
 
-    commandList->DrawInstanced(static_cast<uint32_t>(6 * mQuads.size()), 1, 0, 0);
-    mQuads.clear();
+    commandList->DrawInstanced(static_cast<uint32_t>(6 * mQuads.Size()), 1, 0, 0);
+    mQuads.Clear();
 }
 
 void ColoredQuadRenderer::AddQuad(const float x, const float y, const float width, const float height, const DirectX::XMFLOAT4& color)
 {
-    ensure(mQuads.size() < MaxQuads);
-    mQuads.push_back({ x, y, width, height, color });
+    ensure(mQuads.Size() < MaxQuads);
+    mQuads.PushBack({ x, y, width, height, color });
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1220,15 +1230,15 @@ TextureRef Renderer::Impl::CreateTexture(const std::string_view path)
 
 namespace
 {
-    std::vector<uint8_t> GenerateTextureData(const uint32_t textureWidth, const uint32_t textureHeight, const uint32_t texturePixelSize)
+    std::span<uint8_t> GenerateTextureData(Arena* arena, const uint32_t textureWidth, const uint32_t textureHeight, const uint32_t texturePixelSize)
     {
         const uint32_t rowPitch = textureWidth * texturePixelSize;
         const uint32_t cellPitch = rowPitch >> 3;
         const uint32_t cellHeight = textureWidth >> 3;
         const uint32_t textureSize = rowPitch * textureHeight;
 
-        std::vector<uint8_t> data(textureSize);
-        uint8_t* pData = &data[0];
+        auto data = arena->PushArray<uint8_t>(textureSize);
+        uint8_t* pData = data.data();
 
         for (uint32_t n = 0; n < textureSize; n += texturePixelSize)
         {
@@ -1262,18 +1272,18 @@ void Renderer::Impl::InitializeRenderers()
     ensure(SUCCEEDED(mCommandList->Reset(mCommandAllocator, nullptr)));
 
     {
-        const std::vector<uint8_t> textureData = GenerateTextureData(256, 256, 4);
-        mTexturedQuadRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
+        const auto textureData = GenerateTextureData(mFrameArena, 256, 256, 4);
+        mTexturedQuadRenderer.Initialize(mArena, mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
     }
 
     {
-        std::vector<uint8_t> textureData = Font::GenerateTextureData();
+        const auto textureData = Font::GenerateTextureData(mFrameArena);
         TextureRef font{ CreateTexture(Font::TextureWidth, Font::TextureHeight, Font::TexturePixelSize, textureData.data()) };
-        mTextRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight), font);
+        mTextRenderer.Initialize(mArena, mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight), font);
     }
 
     {
-        mColoredQuadRenderer.Initialize(mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
+        mColoredQuadRenderer.Initialize(mArena, mDevice, mCommandList, static_cast<float>(mWidth), static_cast<float>(mHeight));
     }
 }
 
