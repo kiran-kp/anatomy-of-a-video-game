@@ -1,5 +1,4 @@
 #include <Common.h>
-#include <Util.h>
 
 std::span<Arena*> Arena::sArenas;
 size_t Arena::sNumArenas = 0;
@@ -37,9 +36,28 @@ Arena* Arena::PushArena(const char* name, size_t capacity)
     return newArena;
 }
 
+void Arena::PopTo(size_t marker)
+{
+    mOffset = marker;
+}
+
+void Arena::PopArena(Arena* arena)
+{
+    ensure((mBase + mOffset) == (arena->mBase + arena->mCapacity));
+    for (size_t i = 0; i < sArenas.size(); i++)
+    {
+        if (sArenas[i] == arena)
+        {
+            sArenas[i] = nullptr;
+        }
+    }
+
+    PopTo(arena->mBase - mBase);
+}
+
 void Arena::Clear()
 {
-    mOffset = ArenaHeaderSize;
+    PopTo(ArenaHeaderSize);
 }
 
 size_t Arena::GetUsedSize() const

@@ -1,7 +1,6 @@
 #include <Common.h>
 #include <Log.h>
 #include <Renderer.h>
-#include <Util.h>
 
 #include <WICTextureLoader12.h>
 // Hack: Just include the source for this here to avoid having to set up a project just statically compile this

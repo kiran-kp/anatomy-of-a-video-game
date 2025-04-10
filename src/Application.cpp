@@ -1,6 +1,5 @@
 #include <Application.h>
 #include <Log.h>
-#include <Util.h>
 
 #include <cassert>
 #include <chrono>
@@ -18,11 +17,12 @@ static float Clamp(float x, float minVal, float maxVal)
     return std::max(std::min(x, maxVal), minVal);
 }
 
-struct Image
+struct ImageInit
 {
+    Sprite* sprite;
     float width;
     float height;
-    std::initializer_list<std::string_view> paths;
+    Buffer<std::string_view> paths;
 };
 
 static void ResetPipes(std::array<SpriteInstance, 6>& pipes, Sprite* pipeSprite, const uint32_t windowHeight)
@@ -87,6 +87,8 @@ void Application::Initialize(Arena* arena, void* platformData)
     mAudio->Initialize(audioArena);
     LOG("Initialized Audio");
 
+    auto initArena = mArena->PushArena("ARENA_Init", 1ll * 1024ll * 1024ll);
+
     std::pair<Audio::Ref*, std::string_view> sounds[] = {
         { &mDie, "assets/audio/die.wav" },
         { &mHit, "assets/audio/hit.wav" },
@@ -100,24 +102,33 @@ void Application::Initialize(Arena* arena, void* platformData)
         *ref = mAudio->LoadSound(path);
     }
 
-    std::pair<Sprite*, Image> images[] = {
-        { &mBird, { 34.0f, 24.0f, { "assets/sprites/bluebird-downflap.png", "assets/sprites/bluebird-midflap.png", "assets/sprites/bluebird-upflap.png" } } },
-        { &mBackground, { 288.0f, 512.0f, { "assets/sprites/background-night.png" } } },
-        { &mPipe, { 52.0f, 320.0f, { "assets/sprites/pipe-green.png" } } },
-        { &mBase, { 336.0f, 112.0f, { "assets/sprites/base.png" } } },
-        { &mGameOver, { 192.0f, 42.0f, { "assets/sprites/gameover.png" } } }
+    ImageInit images[] = {
+        { &mBird, 34.0f, 24.0f, initArena->PushArray<std::string_view>(3) },
+        { &mBackground, 288.0f, 512.0f, initArena->PushArray<std::string_view>(1) },
+        { &mPipe, 52.0f, 320.0f, initArena->PushArray<std::string_view>(1) },
+        { &mBase, 336.0f, 112.0f, initArena->PushArray<std::string_view>(1) }
     };
 
-    for (auto& [sprite, image] : images)
+    for (auto path : { "assets/sprites/bluebird-downflap.png", "assets/sprites/bluebird-midflap.png", "assets/sprites/bluebird-upflap.png" })
     {
-        auto textures = mArena->PushArray<TextureRef>(image.paths.size());
-        for (size_t i = 0; auto& path : image.paths)
+        images[0].paths.PushBack({ path });
+    }
+
+    images[1].paths.PushBack({ "assets/sprites/background-night.png" });
+    images[2].paths.PushBack({ "assets/sprites/pipe-green.png" });
+    images[3].paths.PushBack({ "assets/sprites/base.png" });
+
+    for (auto& image : images)
+    {
+        auto textures = initArena->PushArray<TextureRef>(image.paths.Size());
+        for (size_t i = 0; auto& path : image.paths.Get())
         {
+            LOG("Loading texture: %.*s", path.size(), path.data());
             textures[i] = mRenderer->CreateTexture(path);
             i++;
         }
 
-        sprite->Initialize(image.width, image.height, textures, 160.0f);
+        image.sprite->Initialize(image.width, image.height, textures, 160.0f);
     }
 
     mBirdInstance.Initialize(&mBird);
@@ -137,6 +148,9 @@ void Application::Initialize(Arena* arena, void* platformData)
     LOG("Initialized Textures");
     mRenderer->FinishUploadingTextures();
     LOG("Uploaded textures to GPU");
+
+    LOG("InitArena used: %lld bytes", initArena->GetUsedSize());
+    mArena->PopArena(initArena);
 }
 
 void Application::Update(float deltaTime)
@@ -203,6 +217,7 @@ void Application::Update(float deltaTime)
             mDeadTimer -= deltaTime;
             if (mDeadTimer <= 0.0f)
             {
+                LOG("Starting new game");
                 pos = { 50.0f, 200.0f };
                 mPlaying = false;
                 isAlive = true;
@@ -240,6 +255,7 @@ void Application::Update(float deltaTime)
 
             if (mPlaying && collided)
             {
+                LOG("Player collided with pipe. Resetting");
                 mHiScore = std::max(mScore, mHiScore);
                 mScore = 0.0f;
                 mAudio->Play(mDie);
@@ -263,6 +279,7 @@ void Application::Update(float deltaTime)
         mScore += deltaTime / 1000.0f;
         if (oldScore < mHiScore && mScore > mHiScore)
         {
+            LOG("Player beat their hi-score");
             mAudio->Play(mSwoosh);
         }
         else if (mScore > 1.0f && (static_cast<int>(mScore) % 10) == 0)

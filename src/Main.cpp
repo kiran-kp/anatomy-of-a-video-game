@@ -1,7 +1,6 @@
 #include <Application.h>
 #include <Common.h>
 #include <Log.h>
-#include <Util.h>
 
 #include <thread>
 
@@ -76,7 +75,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     LOG("Initialized window");
 
-    constexpr size_t TotalGameMemory = 4ll * 1024ll * 1024ll;
+    constexpr size_t TotalGameMemory = 5ll * 1024ll * 1024ll;
     auto gameMemory = reinterpret_cast<uint8_t*>(malloc(TotalGameMemory));
     memset(gameMemory, 0, TotalGameMemory);
 
@@ -115,11 +114,52 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
         appInstance->Update(deltaTime);
         char buffer[1024];
+        auto getHumanReadableSize = [] (size_t value) -> double
+            {
+                if (value > (1024ll * 1024ll))
+                {
+                    return static_cast<double>(value) / 1024.0 / 1024.0;
+                }
+                else if (value > 1024ll)
+                {
+                    return static_cast<double>(value) / 1024.0;
+                }
+                else
+                {
+                    return static_cast<double>(value);
+                }
+            };
+
+        auto getSizeUnit = [] (size_t value)
+            {
+                if (value > (1024ll * 1024ll))
+                {
+                    return "mb";
+                }
+                else if (value > 1024ll)
+                {
+                    return "kb";
+                }
+                else
+                {
+                    return "b";
+                }
+            };
+
         for (size_t i = 0; i < Arena::sNumArenas; i++)
         {
-            Arena* a = Arena::sArenas[i];
-            auto bufferEnd = std::format_to(buffer, "{}: {}kb/{}kb", a->mName, a->GetUsedSize() / 1024ll, a->GetCapacity() / 1024ll);
-            appInstance->AddDebugText(std::string_view(buffer, bufferEnd), 10, 100 + static_cast<int32_t>(i) * 16);
+            if (Arena* a = Arena::sArenas[i])
+            {
+                auto bufferEnd = std::format_to(buffer,
+                                                "{}: {:.2f}{}/{:.2f}{}",
+                                                a->mName,
+                                                getHumanReadableSize(a->GetUsedSize()),
+                                                getSizeUnit(a->GetUsedSize()),
+                                                getHumanReadableSize(a->GetCapacity()),
+                                                getSizeUnit(a->GetCapacity()));
+
+                appInstance->AddDebugText(std::string_view(buffer, bufferEnd), 10, 100 + static_cast<int32_t>(i) * 16);
+            }
         }
 
         appInstance->Render();

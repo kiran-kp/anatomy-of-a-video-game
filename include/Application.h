@@ -44,7 +44,6 @@ private:
     Sprite mBird;
     Sprite mPipe;
     Sprite mBase;
-    Sprite mGameOver;
 
     float mScrollSpeed;
     float mBirdYVelocity;

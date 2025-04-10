@@ -97,6 +97,8 @@ struct Arena
     }
 
     Arena* PushArena(const char* name, size_t capacity);
+    void PopTo(size_t marker);
+    void PopArena(Arena* arena);
     void Clear();
 
     size_t GetUsedSize() const;
