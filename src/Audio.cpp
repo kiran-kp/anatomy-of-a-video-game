@@ -33,7 +33,7 @@ struct Sound
     bool playing;
 };
 
-struct Impl
+struct Audio::Impl
 {
     IXAudio2* xaudio2;
     IXAudio2MasteringVoice* masteringVoice;
@@ -49,12 +49,10 @@ void VoiceCallback::OnBufferEnd(void* pBufferContext) noexcept
 void Audio::Initialize(Arena* arena)
 {
     mArena = arena;
-    auto impl = mArena->Push<Impl>();
+    mImpl = mArena->Push<Impl>();
     ensure(SUCCEEDED(::CoInitializeEx(nullptr, COINIT_MULTITHREADED)));
-    ensure(SUCCEEDED(::XAudio2Create(&impl->xaudio2, 0, XAUDIO2_DEFAULT_PROCESSOR)));
-    ensure(SUCCEEDED(impl->xaudio2->CreateMasteringVoice(&impl->masteringVoice)));
-
-    mImpl = reinterpret_cast<uintptr_t>(impl);
+    ensure(SUCCEEDED(::XAudio2Create(&mImpl->xaudio2, 0, XAUDIO2_DEFAULT_PROCESSOR)));
+    ensure(SUCCEEDED(mImpl->xaudio2->CreateMasteringVoice(&mImpl->masteringVoice)));
 }
 
 #define fourccRIFF 'FFIR'
@@ -137,7 +135,6 @@ HRESULT ReadChunkData(HANDLE hFile, void* buffer, DWORD buffersize, DWORD buffer
 
 Audio::Ref Audio::LoadSound(std::string_view path)
 {
-    Impl* impl = reinterpret_cast<Impl*>(mImpl);
     auto snd = mArena->Push<Sound>();
     memset(snd, 0, sizeof(snd));
     new (snd) Sound();
@@ -180,7 +177,7 @@ Audio::Ref Audio::LoadSound(std::string_view path)
 
     new (&snd->callback) VoiceCallback();
     snd->callback.mSnd = snd;
-    ensure(SUCCEEDED(impl->xaudio2->CreateSourceVoice(&snd->sourceVoice, (WAVEFORMATEX*)&snd->wfx, 0, 2.0f, &snd->callback)));
+    ensure(SUCCEEDED(mImpl->xaudio2->CreateSourceVoice(&snd->sourceVoice, (WAVEFORMATEX*)&snd->wfx, 0, 2.0f, &snd->callback)));
 
     return { reinterpret_cast<uintptr_t>(snd) };
 }

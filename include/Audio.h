@@ -23,5 +23,7 @@ private:
     ~Audio() = delete;
 
     Arena* mArena;
-    uintptr_t mImpl;
+
+    struct Impl;
+    Impl* mImpl;
 };
