@@ -330,7 +330,8 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
     Clay_Color contentBackgroundColor = { 90, 90, 90, 255 };
 
     // Build UI here
-    CLAY({ .id = CLAY_ID("OuterContainer"),
+    CLAY({
+        .id = CLAY_ID("OuterContainer"),
         .backgroundColor = {43, 41, 51, 255 },
         .layout = {
             .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -340,7 +341,8 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
         }
     }) {
         // Child elements go inside braces
-        CLAY({ .id = CLAY_ID("Output"),
+        CLAY({
+            .id = CLAY_ID("Output"),
             .layout = {
                 .sizing = {
                     .height = CLAY_SIZING_FIXED(300),
@@ -361,7 +363,8 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
             .id = CLAY_ID("InputControls"),
             .layout = { .sizing = layoutExpand, .childGap = 8 }
         }) {
-            CLAY({ .id = CLAY_ID("MainContent"),
+            CLAY({
+                .id = CLAY_ID("MainContent"),
                 .backgroundColor = contentBackgroundColor,
                 .clip = { .vertical = true, .childOffset = Clay_GetScrollOffset() },
                 .layout = {
@@ -371,45 +374,59 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                     .sizing = layoutExpand
                 }
             }) {
-                CLAY({ .id = CLAY_ID("Buttons"),
-                       .layout = { .layoutDirection = CLAY_TOP_TO_BOTTOM,
-                                .childGap = 8,
-                                   .sizing = layoutExpand }}) {
-                    CLAY({ .id = CLAY_ID("ButtonsRow0"),
-                            .layout = {
-                                .layoutDirection = CLAY_LEFT_TO_RIGHT,
-                                .childGap = 8,
-                               .sizing = layoutExpand }}) {
+                CLAY({
+                    .id = CLAY_ID("Buttons"),
+                    .layout = {
+                        .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                        .childGap = 8,
+                        .sizing = layoutExpand
+                }}) {
+                    CLAY({
+                        .id = CLAY_ID("ButtonsRow0"),
+                        .layout = {
+                             .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                             .childGap = 8,
+                             .sizing = layoutExpand
+                    }}) {
                         RenderNumberButton(CLAY_STRING("7"));
                         RenderNumberButton(CLAY_STRING("8"));
                         RenderNumberButton(CLAY_STRING("9"));
                         RenderNumberButton(CLAY_STRING("÷"));
                     }
 
-                    CLAY({ .id = CLAY_ID("ButtonsRow1"),
-                            .layout = { .layoutDirection = CLAY_LEFT_TO_RIGHT,
-                                .childGap = 8,
-                           .sizing = layoutExpand }}) {
+                    CLAY({
+                        .id = CLAY_ID("ButtonsRow1"),
+                        .layout = {
+                            .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                            .childGap = 8,
+                            .sizing = layoutExpand
+                    }}) {
                         RenderNumberButton(CLAY_STRING("4"));
                         RenderNumberButton(CLAY_STRING("5"));
                         RenderNumberButton(CLAY_STRING("6"));
                         RenderNumberButton(CLAY_STRING("×"));
                     }
 
-                    CLAY({ .id = CLAY_ID("ButtonsRow2"),
-                            .layout = { .layoutDirection = CLAY_LEFT_TO_RIGHT,
-                                .childGap = 8,
-                           .sizing = layoutExpand }}) {
+                    CLAY({
+                        .id = CLAY_ID("ButtonsRow2"),
+                        .layout = {
+                            .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                            .childGap = 8,
+                            .sizing = layoutExpand
+                    }}) {
                         RenderNumberButton(CLAY_STRING("1"));
                         RenderNumberButton(CLAY_STRING("2"));
                         RenderNumberButton(CLAY_STRING("3"));
                         RenderNumberButton(CLAY_STRING("-"));
                     }
 
-                    CLAY({ .id = CLAY_ID("ButtonsRow3"),
-                            .layout = { .layoutDirection = CLAY_LEFT_TO_RIGHT,
-                                .childGap = 8,
-                           .sizing = layoutExpand }}) {
+                    CLAY({
+                        .id = CLAY_ID("ButtonsRow3"),
+                        .layout = {
+                            .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                            .childGap = 8,
+                            .sizing = layoutExpand
+                    }}) {
                         RenderNumberButton(CLAY_STRING("0"));
                         RenderNumberButton(CLAY_STRING("."));
                         RenderNumberButton(CLAY_STRING("%"));
