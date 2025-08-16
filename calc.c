@@ -17,6 +17,7 @@
 // ------------------------------------------------------------------------------------------
 // Renderer
 // ------------------------------------------------------------------------------------------
+
 typedef struct {
     SDL_Renderer *renderer;
     TTF_TextEngine *textEngine;
@@ -278,17 +279,46 @@ static void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Cla
 // ------------------------------------------------------------------------------------------
 // Layout
 // ------------------------------------------------------------------------------------------
-const int FONT_ID_BODY_16 = 0;
-Clay_Color COLOR_WHITE = { 255, 255, 255, 255};
-
-typedef struct {
-    Clay_String label;
-} Button;
+
+static const int FONT_ID_BODY_16 = 0;
+static const Clay_Color COLOR_WHITE = { 255, 255, 255, 255};
+static const Clay_Color COLOR_BACKGROUND = (Clay_Color) {23, 23, 23, 255};
+static const Clay_Color COLOR_NUMBER_BUTTON = (Clay_Color) {38, 38, 38, 255};
+static const Clay_Color COLOR_OPERATION_BUTTON = (Clay_Color) {24, 24, 27, 255};
+static const Clay_Color COLOR_SPECIAL_OPERATION_BUTTON = (Clay_Color) {30, 64, 175, 255};
 
 void RenderNumberButton(Clay_String text) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_GROW(0), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
-        .backgroundColor = { 140, 140, 140, 255 },
+        .backgroundColor = COLOR_NUMBER_BUTTON,
+        .cornerRadius = CLAY_CORNER_RADIUS(5)
+    }) {
+        CLAY_TEXT(text, CLAY_TEXT_CONFIG({
+            .fontId = FONT_ID_BODY_16,
+            .fontSize = 16,
+            .textColor = { 255, 255, 255, 255 }
+        }));
+    }
+}
+
+void RenderOperationButton(Clay_String text) {
+    CLAY({
+        .layout = { .sizing = { .height = CLAY_SIZING_GROW(0), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
+        .backgroundColor = COLOR_OPERATION_BUTTON,
+        .cornerRadius = CLAY_CORNER_RADIUS(5)
+    }) {
+        CLAY_TEXT(text, CLAY_TEXT_CONFIG({
+            .fontId = FONT_ID_BODY_16,
+            .fontSize = 16,
+            .textColor = { 255, 255, 255, 255 }
+        }));
+    }
+}
+
+void RenderSpecialOperationButton(Clay_String text) {
+    CLAY({
+        .layout = { .sizing = { .height = CLAY_SIZING_GROW(0), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
+        .backgroundColor = COLOR_SPECIAL_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
@@ -390,7 +420,8 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                         RenderNumberButton(CLAY_STRING("7"));
                         RenderNumberButton(CLAY_STRING("8"));
                         RenderNumberButton(CLAY_STRING("9"));
-                        RenderNumberButton(CLAY_STRING("÷"));
+                        RenderOperationButton(CLAY_STRING("÷"));
+                        RenderOperationButton(CLAY_STRING(""));
                     }
 
                     CLAY({
@@ -403,7 +434,8 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                         RenderNumberButton(CLAY_STRING("4"));
                         RenderNumberButton(CLAY_STRING("5"));
                         RenderNumberButton(CLAY_STRING("6"));
-                        RenderNumberButton(CLAY_STRING("×"));
+                        RenderOperationButton(CLAY_STRING("×"));
+                        RenderOperationButton(CLAY_STRING(""));
                     }
 
                     CLAY({
@@ -416,7 +448,8 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                         RenderNumberButton(CLAY_STRING("1"));
                         RenderNumberButton(CLAY_STRING("2"));
                         RenderNumberButton(CLAY_STRING("3"));
-                        RenderNumberButton(CLAY_STRING("-"));
+                        RenderOperationButton(CLAY_STRING("-"));
+                        RenderOperationButton(CLAY_STRING(""));
                     }
 
                     CLAY({
@@ -427,9 +460,10 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                             .sizing = layoutExpand
                     }}) {
                         RenderNumberButton(CLAY_STRING("0"));
-                        RenderNumberButton(CLAY_STRING("."));
-                        RenderNumberButton(CLAY_STRING("%"));
-                        RenderNumberButton(CLAY_STRING("+"));
+                        RenderOperationButton(CLAY_STRING("."));
+                        RenderOperationButton(CLAY_STRING("%"));
+                        RenderOperationButton(CLAY_STRING("+"));
+                        RenderSpecialOperationButton(CLAY_STRING("="));
                     }
                 }
             }
@@ -443,11 +477,11 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
     return renderCommands;
 }
 
+// ------------------------------------------------------------------------------------------
+// SDL Application
+// ------------------------------------------------------------------------------------------
+
 static const Uint32 FONT_ID = 0;
-
-static const Clay_Color COLOR_ORANGE    = (Clay_Color) {225, 138, 50, 255};
-static const Clay_Color COLOR_BLUE      = (Clay_Color) {111, 173, 162, 255};
-static const Clay_Color COLOR_LIGHT     = (Clay_Color) {224, 215, 210, 255};
 
 typedef struct {
     SDL_Window *window;
