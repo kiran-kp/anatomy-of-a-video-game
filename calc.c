@@ -156,8 +156,7 @@ static void SDL_Clay_RenderArc(Clay_SDL3RendererData *rendererData, const SDL_FP
 
 SDL_Rect currentClippingRectangle;
 
-static void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Clay_RenderCommandArray *rcommands)
-{
+static void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Clay_RenderCommandArray *rcommands) {
     for (size_t i = 0; i < rcommands->length; i++) {
         Clay_RenderCommand *rcmd = Clay_RenderCommandArray_Get(rcommands, i);
         const Clay_BoundingBox bounding_box = rcmd->boundingBox;
@@ -443,6 +442,7 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
     }
     return renderCommands;
 }
+
 static const Uint32 FONT_ID = 0;
 
 static const Clay_Color COLOR_ORANGE    = (Clay_Color) {225, 138, 50, 255};
@@ -455,8 +455,7 @@ typedef struct {
     CalcData demoData;
 } AppState;
 
-static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData)
-{
+static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData) {
     TTF_Font **fonts = userData;
     TTF_Font *font = fonts[config->fontId];
     int width, height;
@@ -473,8 +472,7 @@ void HandleClayErrors(Clay_ErrorData errorData) {
     printf("Error: %s\n", errorData.errorText.chars);
 }
 
-SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
-{
+SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     (void) argc;
     (void) argv;
 
@@ -533,8 +531,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
-{
+SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     SDL_AppResult ret_val = SDL_APP_CONTINUE;
 
     switch (event->type) {
@@ -566,8 +563,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     return ret_val;
 }
 
-SDL_AppResult SDL_AppIterate(void *appstate)
-{
+SDL_AppResult SDL_AppIterate(void *appstate) {
     AppState *state = appstate;
 
     Clay_RenderCommandArray render_commands = CalcCreateLayout(&state->demoData);
@@ -582,8 +578,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     return SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void *appstate, SDL_AppResult result)
-{
+void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     (void) result;
 
     if (result != SDL_APP_SUCCESS) {
@@ -612,5 +607,6 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
         SDL_free(state);
     }
+
     TTF_Quit();
 }
