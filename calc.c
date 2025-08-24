@@ -18,8 +18,26 @@ static const Clay_Color COLOR_OPERATION_BUTTON = (Clay_Color) {24, 24, 27, 255};
 static const Clay_Color COLOR_SPECIAL_OPERATION_BUTTON = (Clay_Color) {30, 64, 175, 255};
 static const Clay_Color COLOR_CONTENT_BACKGROUND = { 90, 90, 90, 255 };
 
+Clay_ElementDeclaration MakeColumn(Clay_ElementId id) {
+    return (Clay_ElementDeclaration) {
+        .id = id,
+        .layout = {
+            .layoutDirection = CLAY_TOP_TO_BOTTOM,
+            .childGap = 8,
+            .sizing = { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_GROW(0) }
+        }
+    };
+}
 
-void RenderNumberButton(Clay_String text) {
+void MakeSpacer(Clay_Color color) {
+    CLAY({
+        .layout = { .sizing = { .height = CLAY_SIZING_GROW(0), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
+        .backgroundColor = color,
+    }) {
+    }
+}
+
+void MakeNumberButton(Clay_String text) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = COLOR_NUMBER_BUTTON,
@@ -33,7 +51,7 @@ void RenderNumberButton(Clay_String text) {
     }
 }
 
-void RenderOperationButton(Clay_String text) {
+void MakeOperationButton(Clay_String text) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = COLOR_OPERATION_BUTTON,
@@ -47,7 +65,7 @@ void RenderOperationButton(Clay_String text) {
     }
 }
 
-void RenderSpecialOperationButton(Clay_String text) {
+void MakeSpecialOperationButton(Clay_String text) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.5f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = COLOR_SPECIAL_OPERATION_BUTTON,
@@ -127,77 +145,43 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                 .backgroundColor = COLOR_CONTENT_BACKGROUND,
                 .clip = { .vertical = true, .childOffset = Clay_GetScrollOffset() },
                 .layout = {
-                .layoutDirection = CLAY_LEFT_TO_RIGHT,
-                .childGap = 8,
-                .padding = CLAY_PADDING_ALL(8),
-                .sizing = layoutExpand
-            }
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                    .childGap = 8,
+                    .padding = CLAY_PADDING_ALL(8),
+                    .sizing = layoutExpand
+                }
             }) {
-                CLAY({
-                    .id = CLAY_ID("ButtonsCol0"),
-                    .layout = {
-                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
-                    .childGap = 8,
-                    .sizing = { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_GROW(0) }
-                }}) {
-                    RenderNumberButton(CLAY_STRING("7"));
-                    RenderNumberButton(CLAY_STRING("4"));
-                    RenderNumberButton(CLAY_STRING("1"));
-                    RenderNumberButton(CLAY_STRING("0"));
+                CLAY(MakeColumn(CLAY_ID("ButtonsCol0"))) {
+                    MakeNumberButton(CLAY_STRING("7"));
+                    MakeNumberButton(CLAY_STRING("4"));
+                    MakeNumberButton(CLAY_STRING("1"));
+                    MakeNumberButton(CLAY_STRING("0"));
                 }
 
-                CLAY({
-                    .id = CLAY_ID("ButtonsCol1"),
-                    .layout = {
-                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
-                    .childGap = 8,
-                    .sizing = { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_GROW(0) }
-                }}) {
+                CLAY(MakeColumn(CLAY_ID("ButtonsCol1"))) {
+                    MakeNumberButton(CLAY_STRING("8"));
+                    MakeNumberButton(CLAY_STRING("5"));
+                    MakeNumberButton(CLAY_STRING("2"));
+                    MakeOperationButton(CLAY_STRING("."));
+                }
 
-                    RenderNumberButton(CLAY_STRING("8"));
-                    RenderNumberButton(CLAY_STRING("5"));
-                    RenderNumberButton(CLAY_STRING("2"));
-                    RenderOperationButton(CLAY_STRING("."));
+                CLAY(MakeColumn(CLAY_ID("ButtonsCol2"))) {
+                    MakeNumberButton(CLAY_STRING("9"));
+                    MakeNumberButton(CLAY_STRING("6"));
+                    MakeNumberButton(CLAY_STRING("3"));
+                    MakeOperationButton(CLAY_STRING("%"));
                 }
-                CLAY({
-                    .id = CLAY_ID("ButtonsCol2"),
-                    .layout = {
-                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
-                    .childGap = 8,
-                    .sizing = { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_GROW(0) }
-                }}) {
-                    RenderNumberButton(CLAY_STRING("9"));
-                    RenderNumberButton(CLAY_STRING("6"));
-                    RenderNumberButton(CLAY_STRING("3"));
-                    RenderOperationButton(CLAY_STRING("%"));
-                }
-                CLAY({
-                    .id = CLAY_ID("ButtonsCol3"),
-                    .layout = {
-                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
-                    .childGap = 8,
-                    .sizing = { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_GROW(0) }
-                }}) {
-                    RenderOperationButton(CLAY_STRING("÷"));
-                    RenderOperationButton(CLAY_STRING("×"));
-                    RenderOperationButton(CLAY_STRING("-"));
-                    RenderOperationButton(CLAY_STRING("+"));
-                }
-                CLAY({
-                    .id = CLAY_ID("ButtonsCol4"),
-                    .layout = {
-                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
-                    .childGap = 8,
-                    .sizing = { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_PERCENT(1.0f) }
-                }}) {
-                    CLAY({
-                        .layout = { .sizing = { .height = CLAY_SIZING_GROW(0), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
-                        .backgroundColor = COLOR_CONTENT_BACKGROUND,
-                        .cornerRadius = CLAY_CORNER_RADIUS(5)
-                    }) {
-                    }
 
-                    RenderSpecialOperationButton(CLAY_STRING("="));
+                CLAY(MakeColumn(CLAY_ID("ButtonsCol3"))) {
+                    MakeOperationButton(CLAY_STRING("÷"));
+                    MakeOperationButton(CLAY_STRING("×"));
+                    MakeOperationButton(CLAY_STRING("-"));
+                    MakeOperationButton(CLAY_STRING("+"));
+                }
+
+                CLAY(MakeColumn(CLAY_ID("ButtonsCol4"))) {
+                    MakeSpacer(COLOR_CONTENT_BACKGROUND);
+                    MakeSpecialOperationButton(CLAY_STRING("="));
                 }
             }
         }
