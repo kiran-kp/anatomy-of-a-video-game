@@ -7,11 +7,10 @@
 #include "clay.h"
 
 #include <stdio.h>
-
+
 // ------------------------------------------------------------------------------------------
 // Layout
 // ------------------------------------------------------------------------------------------
-
 static const int FONT_ID_BODY_16 = 0;
 static const Clay_Color COLOR_WHITE = { 255, 255, 255, 255};
 static const Clay_Color COLOR_BACKGROUND = (Clay_Color) {23, 23, 23, 255};
@@ -49,7 +48,7 @@ void RenderOperationButton(Clay_String text) {
 
 void RenderSpecialOperationButton(Clay_String text) {
     CLAY({
-        .layout = { .sizing = { .height = CLAY_SIZING_GROW(0), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
+        .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.5f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = COLOR_SPECIAL_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
@@ -129,31 +128,30 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                 .backgroundColor = contentBackgroundColor,
                 .clip = { .vertical = true, .childOffset = Clay_GetScrollOffset() },
                 .layout = {
-                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                    .layoutDirection = CLAY_LEFT_TO_RIGHT,
                     .childGap = 8,
                     .padding = CLAY_PADDING_ALL(8),
                     .sizing = layoutExpand
                 }
             }) {
                 CLAY({
-                    .id = CLAY_ID("Buttons"),
+                    .id = CLAY_ID("ButtonsCol0"),
                     .layout = {
                         .layoutDirection = CLAY_TOP_TO_BOTTOM,
                         .childGap = 8,
-                        .sizing = layoutExpand
+                        .sizing = { .width = CLAY_SIZING_PERCENT(0.80f), .height = CLAY_SIZING_GROW(0) }
                 }}) {
                     CLAY({
                         .id = CLAY_ID("ButtonsRow0"),
                         .layout = {
                              .layoutDirection = CLAY_LEFT_TO_RIGHT,
                              .childGap = 8,
-                             .sizing = layoutExpand
+                             .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_PERCENT(0.25f) }
                     }}) {
                         RenderNumberButton(CLAY_STRING("7"));
                         RenderNumberButton(CLAY_STRING("8"));
                         RenderNumberButton(CLAY_STRING("9"));
                         RenderOperationButton(CLAY_STRING("÷"));
-                        RenderOperationButton(CLAY_STRING(""));
                     }
 
                     CLAY({
@@ -161,13 +159,12 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                         .layout = {
                             .layoutDirection = CLAY_LEFT_TO_RIGHT,
                             .childGap = 8,
-                            .sizing = layoutExpand
+                            .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_PERCENT(0.25f) }
                     }}) {
                         RenderNumberButton(CLAY_STRING("4"));
                         RenderNumberButton(CLAY_STRING("5"));
                         RenderNumberButton(CLAY_STRING("6"));
                         RenderOperationButton(CLAY_STRING("×"));
-                        RenderOperationButton(CLAY_STRING(""));
                     }
 
                     CLAY({
@@ -175,13 +172,12 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                         .layout = {
                             .layoutDirection = CLAY_LEFT_TO_RIGHT,
                             .childGap = 8,
-                            .sizing = layoutExpand
+                            .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_PERCENT(0.25f) }
                     }}) {
                         RenderNumberButton(CLAY_STRING("1"));
                         RenderNumberButton(CLAY_STRING("2"));
                         RenderNumberButton(CLAY_STRING("3"));
                         RenderOperationButton(CLAY_STRING("-"));
-                        RenderOperationButton(CLAY_STRING(""));
                     }
 
                     CLAY({
@@ -189,14 +185,30 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
                         .layout = {
                             .layoutDirection = CLAY_LEFT_TO_RIGHT,
                             .childGap = 8,
-                            .sizing = layoutExpand
+                            .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_PERCENT(0.25f) }
                     }}) {
                         RenderNumberButton(CLAY_STRING("0"));
                         RenderOperationButton(CLAY_STRING("."));
                         RenderOperationButton(CLAY_STRING("%"));
                         RenderOperationButton(CLAY_STRING("+"));
-                        RenderSpecialOperationButton(CLAY_STRING("="));
                     }
+                }
+
+                CLAY({
+                    .id = CLAY_ID("ButtonsCol1"),
+                    .layout = {
+                        .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                        .childGap = 8,
+                        .sizing = { .width = CLAY_SIZING_PERCENT(0.80f), .height = CLAY_SIZING_PERCENT(1.0f) }
+                }}) {
+                    CLAY({
+                        .layout = { .sizing = { .height = CLAY_SIZING_GROW(0), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
+                        .backgroundColor = COLOR_OPERATION_BUTTON,
+                        .cornerRadius = CLAY_CORNER_RADIUS(5)
+                    }) {
+                    }
+
+                    RenderSpecialOperationButton(CLAY_STRING("="));
                 }
             }
         }
@@ -209,10 +221,10 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
     return renderCommands;
 }
 
+
 // ------------------------------------------------------------------------------------------
 // Renderer
 // ------------------------------------------------------------------------------------------
-
 typedef struct {
     SDL_Renderer *renderer;
     TTF_TextEngine *textEngine;
@@ -471,10 +483,10 @@ static void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Cla
     }
 }
 
+
 // ------------------------------------------------------------------------------------------
 // SDL Application
 // ------------------------------------------------------------------------------------------
-
 static const Uint32 FONT_ID = 0;
 
 typedef struct {
