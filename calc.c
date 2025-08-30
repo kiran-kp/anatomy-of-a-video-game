@@ -18,6 +18,19 @@ static const Clay_Color COLOR_OPERATION_BUTTON = (Clay_Color) {24, 24, 27, 255};
 static const Clay_Color COLOR_SPECIAL_OPERATION_BUTTON = (Clay_Color) {30, 64, 175, 255};
 static const Clay_Color COLOR_CONTENT_BACKGROUND = { 90, 90, 90, 255 };
 
+Clay_ElementDeclaration MakePanel(Clay_ElementId id, Clay_Color color, Clay_LayoutDirection direction, uint16_t childGap, Clay_Padding padding) {
+    return (Clay_ElementDeclaration) {
+        .id = id,
+        .backgroundColor = color,
+        .layout = {
+           .layoutDirection = direction,
+           .childGap = childGap,
+           .padding = padding,
+           .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }
+        }
+    };
+}
+
 Clay_ElementDeclaration MakeColumn(Clay_ElementId id) {
     return (Clay_ElementDeclaration) {
         .id = id,
@@ -26,6 +39,25 @@ Clay_ElementDeclaration MakeColumn(Clay_ElementId id) {
             .childGap = 8,
             .sizing = { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_GROW(0) }
         }
+    };
+}
+
+Clay_ElementDeclaration MakeOutputPanel(Clay_ElementId id) {
+    return (Clay_ElementDeclaration) {
+        .id = CLAY_ID("Output"),
+        .layout = {
+            .sizing = {
+                .height = CLAY_SIZING_FIXED(300),
+                .width = CLAY_SIZING_GROW(0)
+            },
+            .padding = { 16, 16, 0, 0 },
+            .childGap = 16,
+            .childAlignment = {
+                .y = CLAY_ALIGN_Y_CENTER
+            }
+        },
+        .backgroundColor = COLOR_CONTENT_BACKGROUND,
+        .cornerRadius = CLAY_CORNER_RADIUS(8)
     };
 }
 
@@ -101,10 +133,7 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
 
     Clay_BeginLayout();
 
-    Clay_Sizing layoutExpand = {
-        .width = CLAY_SIZING_GROW(0),
-        .height = CLAY_SIZING_GROW(0)
-    };
+    Clay_Sizing layoutExpand = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) };
 
     // Build UI here
     CLAY({
@@ -118,39 +147,11 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
         }
     }) {
         // Child elements go inside braces
-        CLAY({
-            .id = CLAY_ID("Output"),
-            .layout = {
-                .sizing = {
-                    .height = CLAY_SIZING_FIXED(300),
-                    .width = CLAY_SIZING_GROW(0)
-                },
-                .padding = { 16, 16, 0, 0 },
-                .childGap = 16,
-                .childAlignment = {
-                    .y = CLAY_ALIGN_Y_CENTER
-                }
-            },
-            .backgroundColor = COLOR_CONTENT_BACKGROUND,
-            .cornerRadius = CLAY_CORNER_RADIUS(8)
-        }) {
+        CLAY(MakeOutputPanel(CLAY_ID("Output"))) {
         }
 
-        CLAY({
-            .id = CLAY_ID("InputControls"),
-            .layout = { .sizing = layoutExpand, .childGap = 8 }
-        }) {
-            CLAY({
-                .id = CLAY_ID("MainContent"),
-                .backgroundColor = COLOR_CONTENT_BACKGROUND,
-                .clip = { .vertical = true, .childOffset = Clay_GetScrollOffset() },
-                .layout = {
-                    .layoutDirection = CLAY_LEFT_TO_RIGHT,
-                    .childGap = 8,
-                    .padding = CLAY_PADDING_ALL(8),
-                    .sizing = layoutExpand
-                }
-            }) {
+        CLAY({.id = CLAY_ID("InputControls"), .layout = { .sizing = layoutExpand, .childGap = 8 }}) {
+            CLAY(MakePanel(CLAY_ID("MainContent"), COLOR_CONTENT_BACKGROUND, CLAY_LEFT_TO_RIGHT, 8, CLAY_PADDING_ALL(8))) {
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol0"))) {
                     MakeNumberButton(CLAY_STRING("7"));
                     MakeNumberButton(CLAY_STRING("4"));
