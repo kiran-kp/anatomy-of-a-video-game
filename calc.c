@@ -7,6 +7,7 @@
 #include "clay.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 // ------------------------------------------------------------------------------------------
 // Layout
@@ -18,47 +19,36 @@ static const Clay_Color COLOR_OPERATION_BUTTON = (Clay_Color) {24, 24, 27, 255};
 static const Clay_Color COLOR_SPECIAL_OPERATION_BUTTON = (Clay_Color) {30, 64, 175, 255};
 static const Clay_Color COLOR_CONTENT_BACKGROUND = { 90, 90, 90, 255 };
 
-Clay_ElementDeclaration MakePanel(Clay_ElementId id, Clay_Color color, Clay_LayoutDirection direction, uint16_t childGap, Clay_Padding padding) {
+Clay_ElementDeclaration MakeRect(Clay_ElementId id, Clay_Sizing sizing, uint16_t childGap) {
     return (Clay_ElementDeclaration) {
         .id = id,
-        .backgroundColor = color,
         .layout = {
-           .layoutDirection = direction,
-           .childGap = childGap,
-           .padding = padding,
-           .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }
+            .sizing = sizing,
+            .childGap = childGap
         }
     };
+}
+
+Clay_ElementDeclaration MakePanel(Clay_ElementId id, Clay_Color color, Clay_LayoutDirection direction, uint16_t childGap, Clay_Padding padding) {
+    Clay_ElementDeclaration panel = MakeRect(id, (Clay_Sizing) { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }, childGap);
+    panel.backgroundColor = color;
+    panel.layout.layoutDirection = direction;
+    panel.layout.padding = padding;
+    return panel;
 }
 
 Clay_ElementDeclaration MakeColumn(Clay_ElementId id) {
-    return (Clay_ElementDeclaration) {
-        .id = id,
-        .layout = {
-            .layoutDirection = CLAY_TOP_TO_BOTTOM,
-            .childGap = 8,
-            .sizing = { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_GROW(0) }
-        }
-    };
+    Clay_ElementDeclaration column = MakeRect(id, (Clay_Sizing) { .width = CLAY_SIZING_PERCENT(0.20f), .height = CLAY_SIZING_GROW(0) }, 8);
+    column.layout.layoutDirection = CLAY_TOP_TO_BOTTOM;
+    return column;
 }
 
 Clay_ElementDeclaration MakeOutputPanel(Clay_ElementId id) {
-    return (Clay_ElementDeclaration) {
-        .id = CLAY_ID("Output"),
-        .layout = {
-            .sizing = {
-                .height = CLAY_SIZING_FIXED(300),
-                .width = CLAY_SIZING_GROW(0)
-            },
-            .padding = { 16, 16, 0, 0 },
-            .childGap = 16,
-            .childAlignment = {
-                .y = CLAY_ALIGN_Y_CENTER
-            }
-        },
-        .backgroundColor = COLOR_CONTENT_BACKGROUND,
-        .cornerRadius = CLAY_CORNER_RADIUS(8)
-    };
+    Clay_ElementDeclaration panel = MakePanel(id, COLOR_CONTENT_BACKGROUND, CLAY_TOP_TO_BOTTOM, 16, (Clay_Padding) {16, 16, 0 , 0});
+    panel.layout.sizing.height = CLAY_SIZING_FIXED(300);
+    panel.layout.childAlignment.y = CLAY_ALIGN_Y_CENTER;
+    panel.cornerRadius = CLAY_CORNER_RADIUS(8);
+    return panel;
 }
 
 void MakeSpacer(Clay_Color color) {
@@ -133,24 +123,11 @@ Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
 
     Clay_BeginLayout();
 
-    Clay_Sizing layoutExpand = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) };
-
-    // Build UI here
-    CLAY({
-        .id = CLAY_ID("OuterContainer"),
-        .backgroundColor = COLOR_BACKGROUND,
-        .layout = {
-            .layoutDirection = CLAY_TOP_TO_BOTTOM,
-            .sizing = layoutExpand,
-            .padding = CLAY_PADDING_ALL(8),
-            .childGap = 8
-        }
-    }) {
-        // Child elements go inside braces
+    CLAY(MakePanel(CLAY_ID("OuterContainer"), COLOR_BACKGROUND, CLAY_TOP_TO_BOTTOM, 8, CLAY_PADDING_ALL(8))) {
         CLAY(MakeOutputPanel(CLAY_ID("Output"))) {
         }
 
-        CLAY({.id = CLAY_ID("InputControls"), .layout = { .sizing = layoutExpand, .childGap = 8 }}) {
+        CLAY(MakeRect(CLAY_ID("InputControls"), (Clay_Sizing) { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }, 8)) {
             CLAY(MakePanel(CLAY_ID("MainContent"), COLOR_CONTENT_BACKGROUND, CLAY_LEFT_TO_RIGHT, 8, CLAY_PADDING_ALL(8))) {
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol0"))) {
                     MakeNumberButton(CLAY_STRING("7"));
