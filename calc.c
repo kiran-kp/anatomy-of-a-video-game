@@ -104,6 +104,12 @@ CalcData *CalcInitialize() {
     app->operand0 = CalcArenaAllocString(&appArena, 16);
     app->operand1 = CalcArenaAllocString(&appArena, 16);
 
+    for (size_t i = 0; i < 16; i++) {
+        app->history.data[i] = CalcArenaAllocString(&appArena, 16);
+    }
+
+    app->msgs = CalcArenaAlloc(&frameArena, 128, 8);
+
     CalcData data = {
         .appArena = appArena,
         .frameArena = frameArena
@@ -115,6 +121,7 @@ CalcData *CalcInitialize() {
 void CalcUpdate(CalcData *appData) {
 
 }
+
 Clay_ElementDeclaration MakeRect(Clay_ElementId id, Clay_Sizing sizing, uint16_t childGap) {
     return (Clay_ElementDeclaration) {
         .id = id,
@@ -158,7 +165,7 @@ void MakeSpacer(Clay_Color color) {
 void MakeNumberButton(Clay_String text) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
-        .backgroundColor = COLOR_NUMBER_BUTTON,
+        .backgroundColor = Clay_Hovered() ? COLOR_SPECIAL_OPERATION_BUTTON : COLOR_NUMBER_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
@@ -197,8 +204,8 @@ void MakeSpecialOperationButton(Clay_String text) {
     }
 }
 
-Clay_RenderCommandArray CalcRender(CalcData *data) {
-    data->frameArena.offset = 0;
+Clay_RenderCommandArray CalcRender(CalcData *appData) {
+    appData->frameArena.offset = 0;
 
     Clay_BeginLayout();
 
@@ -522,7 +529,7 @@ static const Uint32 FONT_ID = 0;
 typedef struct {
     SDL_Window *window;
     Clay_SDL3RendererData rendererData;
-    CalcData appData;
+    CalcData* appData;
 } AppState;
 
 static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData) {
@@ -595,7 +602,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     Clay_Initialize(clayMemory, (Clay_Dimensions) { (float) width, (float) height }, (Clay_ErrorHandler) { HandleClayErrors });
     Clay_SetMeasureTextFunction(SDL_MeasureText, state->rendererData.fonts);
 
-    state->appData = CalcData_Initialize();
+    state->appData = CalcInitialize();
 
     *appstate = state;
     return SDL_APP_CONTINUE;
@@ -636,8 +643,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 SDL_AppResult SDL_AppIterate(void *appstate) {
     AppState *state = appstate;
 
-    CalcUpdate(&state->appData);
-    Clay_RenderCommandArray render_commands = CalcRender(&state->appData);
+    CalcUpdate(state->appData);
+    Clay_RenderCommandArray render_commands = CalcRender(state->appData);
 
     SDL_SetRenderDrawColor(state->rendererData.renderer, 0, 0, 0, 255);
     SDL_RenderClear(state->rendererData.renderer);
