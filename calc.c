@@ -8,10 +8,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#define ensure(x) if (!(x)) { int *y = 0; *y = 42; }
+
 
 // ------------------------------------------------------------------------------------------
 // Layout
 // ------------------------------------------------------------------------------------------
+
 static const int FONT_ID_BODY_16 = 0;
 static const Clay_Color COLOR_BACKGROUND = (Clay_Color) {43, 41, 51, 255 };
 static const Clay_Color COLOR_NUMBER_BUTTON = (Clay_Color) {38, 38, 38, 255};
@@ -19,6 +23,98 @@ static const Clay_Color COLOR_OPERATION_BUTTON = (Clay_Color) {24, 24, 27, 255};
 static const Clay_Color COLOR_SPECIAL_OPERATION_BUTTON = (Clay_Color) {30, 64, 175, 255};
 static const Clay_Color COLOR_CONTENT_BACKGROUND = { 90, 90, 90, 255 };
 
+typedef enum {
+    CALC_MSG_DIGIT,
+    CALC_MSG_PLUS,
+    CALC_MSG_EQUALS
+} CalcMsg;
+
+typedef struct {
+    CalcMsg msg;
+    uint8_t digit;
+} CalcMsgDigit;
+
+typedef struct {
+    CalcMsg msg;
+} CalcMsgOp;
+
+typedef struct {
+    char *buffer;
+    size_t size;
+    size_t capacity;
+} CalcString;
+
+typedef struct {
+    CalcString data[16];
+    size_t head;
+    size_t tail;
+} CalcHistory;
+
+typedef struct {
+    uint8_t *base;
+    size_t offset;
+    size_t capacity;
+} CalcArena;
+
+typedef struct {
+    CalcArena appArena;
+    CalcArena frameArena;
+
+    // ------------------------------------------------------------------------
+    // App data: Data that lives as long as the application does
+    CalcString operand0;
+    CalcString operand1;
+
+    CalcHistory history;
+
+    // ------------------------------------------------------------------------
+    // Frame data: Data that lives as long as the frame
+    void *msgs;
+} CalcData;
+
+size_t AlignPow2(size_t value, size_t alignment)
+{
+    return (value + (alignment - 1)) & ~(alignment - 1);
+}
+
+uint8_t *CalcArenaAlloc(CalcArena *arena, size_t size, size_t alignment) {
+    size_t start = AlignPow2(arena->offset, alignment);
+    ensure((start + size) < arena->capacity);
+    arena->offset += size;
+
+    uint8_t *ptr = arena->base + start;
+    memset(ptr, 0, size);
+    return ptr;
+}
+
+CalcString CalcArenaAllocString(CalcArena *arena, size_t capacity) {
+    return (CalcString) {
+        .buffer = (char*)CalcArenaAlloc(arena, capacity, 8),
+        .size = 0,
+        .capacity = capacity
+    };
+}
+
+CalcData *CalcInitialize() {
+    CalcArena appArena = { .base = (uint8_t*)malloc(1024), .offset = 0, .capacity = 1024 };
+    CalcArena frameArena = { .base = (uint8_t*)malloc(1024), .offset = 0, .capacity = 1024 };
+
+    CalcData *app = (CalcData*)CalcArenaAlloc(&appArena, sizeof(CalcData), 8);
+
+    app->operand0 = CalcArenaAllocString(&appArena, 16);
+    app->operand1 = CalcArenaAllocString(&appArena, 16);
+
+    CalcData data = {
+        .appArena = appArena,
+        .frameArena = frameArena
+    };
+
+    return app;
+}
+
+void CalcUpdate(CalcData *appData) {
+
+}
 Clay_ElementDeclaration MakeRect(Clay_ElementId id, Clay_Sizing sizing, uint16_t childGap) {
     return (Clay_ElementDeclaration) {
         .id = id,
@@ -101,24 +197,7 @@ void MakeSpecialOperationButton(Clay_String text) {
     }
 }
 
-typedef struct {
-    intptr_t offset;
-    intptr_t memory;
-} CalcArena;
-
-typedef struct {
-    CalcArena frameArena;
-} CalcData;
-
-CalcData CalcData_Initialize() {
-    CalcData data = {
-        .frameArena = { .memory = (intptr_t)malloc(1024) }
-    };
-
-    return data;
-}
-
-Clay_RenderCommandArray CalcCreateLayout(CalcData *data) {
+Clay_RenderCommandArray CalcRender(CalcData *data) {
     data->frameArena.offset = 0;
 
     Clay_BeginLayout();
@@ -443,7 +522,7 @@ static const Uint32 FONT_ID = 0;
 typedef struct {
     SDL_Window *window;
     Clay_SDL3RendererData rendererData;
-    CalcData demoData;
+    CalcData appData;
 } AppState;
 
 static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData) {
@@ -516,7 +595,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     Clay_Initialize(clayMemory, (Clay_Dimensions) { (float) width, (float) height }, (Clay_ErrorHandler) { HandleClayErrors });
     Clay_SetMeasureTextFunction(SDL_MeasureText, state->rendererData.fonts);
 
-    state->demoData = CalcData_Initialize();
+    state->appData = CalcData_Initialize();
 
     *appstate = state;
     return SDL_APP_CONTINUE;
@@ -557,7 +636,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 SDL_AppResult SDL_AppIterate(void *appstate) {
     AppState *state = appstate;
 
-    Clay_RenderCommandArray render_commands = CalcCreateLayout(&state->demoData);
+    CalcUpdate(&state->appData);
+    Clay_RenderCommandArray render_commands = CalcRender(&state->appData);
 
     SDL_SetRenderDrawColor(state->rendererData.renderer, 0, 0, 0, 255);
     SDL_RenderClear(state->rendererData.renderer);
