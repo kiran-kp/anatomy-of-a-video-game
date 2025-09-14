@@ -9,7 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define ensure(x) if (!(x)) { int *y = 0; *y = 42; }
+#define ENSURE(x) if (!(x)) { int *y = 0; *y = 42; }
+#define MOVE(x) x
 
 
 // ------------------------------------------------------------------------------------------
@@ -72,14 +73,16 @@ typedef struct {
     void *msgs;
 } CalcData;
 
+CalcData *gAppData;
+
 size_t AlignPow2(size_t value, size_t alignment)
 {
     return (value + (alignment - 1)) & ~(alignment - 1);
 }
 
-uint8_t *CalcArenaAlloc(CalcArena *arena, size_t size, size_t alignment) {
+uint8_t *CalcArenaAllocWithAlignment(CalcArena *arena, size_t size, size_t alignment) {
     size_t start = AlignPow2(arena->offset, alignment);
-    ensure((start + size) < arena->capacity);
+    ENSURE((start + size) < arena->capacity);
     arena->offset += size;
 
     uint8_t *ptr = arena->base + start;
@@ -87,35 +90,35 @@ uint8_t *CalcArenaAlloc(CalcArena *arena, size_t size, size_t alignment) {
     return ptr;
 }
 
+uint8_t *CalcArenaAlloc(CalcArena *arena, size_t size) {
+    return CalcArenaAllocWithAlignment(arena, size, 8);
+}
+
 CalcString CalcArenaAllocString(CalcArena *arena, size_t capacity) {
     return (CalcString) {
-        .buffer = (char*)CalcArenaAlloc(arena, capacity, 8),
+        .buffer = (char*)CalcArenaAlloc(arena, capacity),
         .size = 0,
         .capacity = capacity
     };
 }
 
-CalcData *CalcInitialize() {
-    CalcArena appArena = { .base = (uint8_t*)malloc(1024), .offset = 0, .capacity = 1024 };
+CalcData *CalcInitialize(CalcArena appArena) {
     CalcArena frameArena = { .base = (uint8_t*)malloc(1024), .offset = 0, .capacity = 1024 };
 
-    CalcData *app = (CalcData*)CalcArenaAlloc(&appArena, sizeof(CalcData), 8);
+    gAppData = (CalcData*)CalcArenaAlloc(&appArena, sizeof(CalcData));
 
-    app->operand0 = CalcArenaAllocString(&appArena, 16);
-    app->operand1 = CalcArenaAllocString(&appArena, 16);
+    gAppData->operand0 = CalcArenaAllocString(&appArena, 16);
+    gAppData->operand1 = CalcArenaAllocString(&appArena, 16);
 
     for (size_t i = 0; i < 16; i++) {
-        app->history.data[i] = CalcArenaAllocString(&appArena, 16);
+        gAppData->history.data[i] = CalcArenaAllocString(&appArena, 16);
     }
 
-    app->msgs = CalcArenaAlloc(&frameArena, 128, 8);
+    gAppData->msgs = CalcArenaAlloc(&frameArena, 128);
 
-    CalcData data = {
-        .appArena = appArena,
-        .frameArena = frameArena
-    };
-
-    return app;
+    gAppData->appArena = appArena;
+    gAppData->frameArena = frameArena;
+    return gAppData;
 }
 
 void CalcUpdate(CalcData *appData) {
@@ -162,12 +165,30 @@ void MakeSpacer(Clay_Color color) {
     }
 }
 
-void MakeNumberButton(Clay_String text) {
+CalcMsgDigit *MakeMsgDigit(uint8_t digit) {
+    CalcMsgDigit *msg = (CalcMsgDigit*)CalcArenaAlloc(&gAppData->frameArena, sizeof(CalcMsgDigit));
+    msg->msg = CALC_MSG_DIGIT;
+    msg->digit = digit;
+
+    return msg;
+}
+
+void OnNumberButtonHovered(Clay_ElementId elemendId, Clay_PointerData pointerInfo, intptr_t userData) {
+    CalcMsgDigit* msg = (CalcMsgDigit*)userData;
+    if (pointerInfo.state == CLAY_POINTER_DATA_PRESSED_THIS_FRAME) {
+        printf("[Calc] OnNumberButtonHovered Presssed: %d : %d\n", pointerInfo.state, msg->digit);
+    } else if (pointerInfo.state == CLAY_POINTER_DATA_RELEASED_THIS_FRAME) {
+        printf("[Calc] OnNumberButtonHovered Released: %d : %d\n", pointerInfo.state, msg->digit);
+    }
+}
+
+void MakeNumberButton(Clay_String text, CalcMsgDigit* msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = Clay_Hovered() ? COLOR_SPECIAL_OPERATION_BUTTON : COLOR_NUMBER_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
+        Clay_OnHover(OnNumberButtonHovered, (intptr_t)msg);
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .fontSize = 16,
@@ -216,23 +237,23 @@ Clay_RenderCommandArray CalcRender(CalcData *appData) {
         CLAY(MakeRect(CLAY_ID("InputControls"), (Clay_Sizing) { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }, 8)) {
             CLAY(MakePanel(CLAY_ID("MainContent"), COLOR_CONTENT_BACKGROUND, CLAY_LEFT_TO_RIGHT, 8, CLAY_PADDING_ALL(8))) {
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol0"))) {
-                    MakeNumberButton(CLAY_STRING("7"));
-                    MakeNumberButton(CLAY_STRING("4"));
-                    MakeNumberButton(CLAY_STRING("1"));
-                    MakeNumberButton(CLAY_STRING("0"));
+                    MakeNumberButton(CLAY_STRING("7"), MOVE(MakeMsgDigit(7)));
+                    MakeNumberButton(CLAY_STRING("4"), MOVE(MakeMsgDigit(4)));
+                    MakeNumberButton(CLAY_STRING("1"), MOVE(MakeMsgDigit(1)));
+                    MakeNumberButton(CLAY_STRING("0"), MOVE(MakeMsgDigit(0)));
                 }
 
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol1"))) {
-                    MakeNumberButton(CLAY_STRING("8"));
-                    MakeNumberButton(CLAY_STRING("5"));
-                    MakeNumberButton(CLAY_STRING("2"));
+                    MakeNumberButton(CLAY_STRING("8"), MOVE(MakeMsgDigit(8)));
+                    MakeNumberButton(CLAY_STRING("5"), MOVE(MakeMsgDigit(5)));
+                    MakeNumberButton(CLAY_STRING("2"), MOVE(MakeMsgDigit(2)));
                     MakeOperationButton(CLAY_STRING("."));
                 }
 
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol2"))) {
-                    MakeNumberButton(CLAY_STRING("9"));
-                    MakeNumberButton(CLAY_STRING("6"));
-                    MakeNumberButton(CLAY_STRING("3"));
+                    MakeNumberButton(CLAY_STRING("9"), MOVE(MakeMsgDigit(9)));
+                    MakeNumberButton(CLAY_STRING("6"), MOVE(MakeMsgDigit(6)));
+                    MakeNumberButton(CLAY_STRING("3"), MOVE(MakeMsgDigit(3)));
                     MakeOperationButton(CLAY_STRING("%"));
                 }
 
@@ -602,7 +623,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     Clay_Initialize(clayMemory, (Clay_Dimensions) { (float) width, (float) height }, (Clay_ErrorHandler) { HandleClayErrors });
     Clay_SetMeasureTextFunction(SDL_MeasureText, state->rendererData.fonts);
 
-    state->appData = CalcInitialize();
+    CalcArena appArena = { .base = (uint8_t*)malloc(1024), .offset = 0, .capacity = 1024 };
+    state->appData = CalcInitialize(MOVE(appArena));
 
     *appstate = state;
     return SDL_APP_CONTINUE;
@@ -612,29 +634,42 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     SDL_AppResult ret_val = SDL_APP_CONTINUE;
 
     switch (event->type) {
-        case SDL_EVENT_QUIT:
-            ret_val = SDL_APP_SUCCESS;
-            break;
-        case SDL_EVENT_KEY_UP:
-            if (event->key.scancode == SDL_SCANCODE_SPACE) {
-            }
-            break;
-        case SDL_EVENT_WINDOW_RESIZED:
-            Clay_SetLayoutDimensions((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
-            break;
-        case SDL_EVENT_MOUSE_MOTION:
-            Clay_SetPointerState((Clay_Vector2) { event->motion.x, event->motion.y },
-                                 event->motion.state & SDL_BUTTON_LMASK);
-            break;
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            Clay_SetPointerState((Clay_Vector2) { event->button.x, event->button.y },
-                                 event->button.button == SDL_BUTTON_LEFT);
-            break;
-        case SDL_EVENT_MOUSE_WHEEL:
-            Clay_UpdateScrollContainers(true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);
-            break;
-        default:
-            break;
+    case SDL_EVENT_QUIT:
+      ret_val = SDL_APP_SUCCESS;
+      break;
+    case SDL_EVENT_KEY_UP:
+      if (event->key.scancode == SDL_SCANCODE_SPACE) {
+      }
+      break;
+    case SDL_EVENT_WINDOW_RESIZED:
+      Clay_SetLayoutDimensions((Clay_Dimensions){(float)event->window.data1,
+                                                 (float)event->window.data2});
+      break;
+    case SDL_EVENT_MOUSE_MOTION:
+      printf("[CalcSDL] MOUSE_MOTION: %f, %f\n", event->motion.x, event->motion.y);
+      Clay_SetPointerState((Clay_Vector2){event->motion.x, event->motion.y},
+                           event->motion.state & SDL_BUTTON_LMASK);
+      break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+      if (event->button.button == SDL_BUTTON_LEFT) {
+        printf("[CalcSDL] BUTTON_DOWN: %f, %f\n", event->button.x, event->button.y);
+        Clay_SetPointerState((Clay_Vector2){event->button.x, event->button.y},
+                             true);
+      }
+      break;
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+      if (event->button.button == SDL_BUTTON_LEFT) {
+        printf("[CalcSDL] BUTTON_UP: %f, %f\n", event->button.x, event->button.y);
+        Clay_SetPointerState((Clay_Vector2){event->button.x, event->button.y},
+                             false);
+      }
+      break;
+    case SDL_EVENT_MOUSE_WHEEL:
+      Clay_UpdateScrollContainers(
+          true, (Clay_Vector2){event->wheel.x, event->wheel.y}, 0.01f);
+      break;
+    default:
+      break;
     };
 
     return ret_val;
