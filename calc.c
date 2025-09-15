@@ -176,9 +176,9 @@ CalcMsgDigit *MakeMsgDigit(uint8_t digit) {
 void OnNumberButtonHovered(Clay_ElementId elemendId, Clay_PointerData pointerInfo, intptr_t userData) {
     CalcMsgDigit* msg = (CalcMsgDigit*)userData;
     if (pointerInfo.state == CLAY_POINTER_DATA_PRESSED_THIS_FRAME) {
-        printf("[Calc] OnNumberButtonHovered Presssed: %d : %d\n", pointerInfo.state, msg->digit);
+        printf("[Calc] OnNumberButtonPresssed: %d\n", msg->digit);
     } else if (pointerInfo.state == CLAY_POINTER_DATA_RELEASED_THIS_FRAME) {
-        printf("[Calc] OnNumberButtonHovered Released: %d : %d\n", pointerInfo.state, msg->digit);
+        printf("[Calc] OnNumberButtonReleased: %d\n", msg->digit);
     }
 }
 
@@ -646,20 +646,17 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                                                  (float)event->window.data2});
       break;
     case SDL_EVENT_MOUSE_MOTION:
-      printf("[CalcSDL] MOUSE_MOTION: %f, %f\n", event->motion.x, event->motion.y);
       Clay_SetPointerState((Clay_Vector2){event->motion.x, event->motion.y},
                            event->motion.state & SDL_BUTTON_LMASK);
       break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
       if (event->button.button == SDL_BUTTON_LEFT) {
-        printf("[CalcSDL] BUTTON_DOWN: %f, %f\n", event->button.x, event->button.y);
         Clay_SetPointerState((Clay_Vector2){event->button.x, event->button.y},
                              true);
       }
       break;
     case SDL_EVENT_MOUSE_BUTTON_UP:
       if (event->button.button == SDL_BUTTON_LEFT) {
-        printf("[CalcSDL] BUTTON_UP: %f, %f\n", event->button.x, event->button.y);
         Clay_SetPointerState((Clay_Vector2){event->button.x, event->button.y},
                              false);
       }
