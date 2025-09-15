@@ -139,9 +139,9 @@ double CalcStringToDouble(CalcString *str) {
 
 void CalcDoubleToString(CalcString *dest, double value) {
     int size = snprintf(dest->buffer, dest->capacity, "%f", value);
-    while (dest->buffer[size - 1] == '0') {
-        size--;
-    }
+    /* while (dest->buffer[size - 1] == '0' || dest->buffer[size - 1] == '.') { */
+    /*     size--; */
+    /* } */
 
     dest->size = size;
 }
@@ -245,19 +245,23 @@ void CalcQueueMsg(CalcMsg *msg) {
     gAppData->msgQueue.size += 1ll;
 }
 
-CalcMsg *MakeMsgDigit(uint8_t digit) {
-    CalcMsg *msg = (CalcMsg*)CalcArenaAlloc(&gAppData->frameArena, sizeof(CalcMsg));
-    msg->type = CALC_MSG_DIGIT;
-    msg->digit = digit;
-
+CalcMsg MakeMsgDigit(uint8_t digit) {
+    CalcMsg msg;
+    msg.type = CALC_MSG_DIGIT;
+    msg.digit = digit;
     return msg;
 }
 
-CalcMsg *MakeMsg(CalcMsgType type) {
-    CalcMsg *msg = (CalcMsg*)CalcArenaAlloc(&gAppData->frameArena, sizeof(CalcMsg));
-    msg->type = type;
-
+CalcMsg MakeMsg(CalcMsgType type) {
+    CalcMsg msg;
+    msg.type = type;
     return msg;
+}
+
+CalcMsg *CopyMsgToFrameArena(CalcMsg msg) {
+    CalcMsg *copy = (CalcMsg*)CalcArenaAlloc(&gAppData->frameArena, sizeof(CalcMsg));
+    memcpy(copy, &msg, sizeof(CalcMsg));
+    return copy;
 }
 
 void OnButtonHovered(Clay_ElementId elemendId, Clay_PointerData pointerInfo, intptr_t userData) {
@@ -271,13 +275,13 @@ void OnButtonHovered(Clay_ElementId elemendId, Clay_PointerData pointerInfo, int
     }
 }
 
-void MakeNumberButton(Clay_String text, CalcMsg *msg) {
+void MakeNumberButton(Clay_String text, CalcMsg msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = Clay_Hovered() ? gSpecialButtonColor : COLOR_NUMBER_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
-        Clay_OnHover(OnButtonHovered, (intptr_t)msg);
+        Clay_OnHover(OnButtonHovered, (intptr_t)CopyMsgToFrameArena(msg));
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .fontSize = 16,
@@ -286,13 +290,13 @@ void MakeNumberButton(Clay_String text, CalcMsg *msg) {
     }
 }
 
-void MakeOperationButton(Clay_String text, CalcMsg *msg) {
+void MakeOperationButton(Clay_String text, CalcMsg msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = COLOR_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
-        Clay_OnHover(OnButtonHovered, (intptr_t)msg);
+        Clay_OnHover(OnButtonHovered, (intptr_t)CopyMsgToFrameArena(msg));
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .fontSize = 16,
@@ -301,13 +305,13 @@ void MakeOperationButton(Clay_String text, CalcMsg *msg) {
     }
 }
 
-void MakeSpecialOperationButton(Clay_String text, CalcMsg *msg) {
+void MakeSpecialOperationButton(Clay_String text, CalcMsg msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.5f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = COLOR_SPECIAL_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
-        Clay_OnHover(OnButtonHovered, (intptr_t)msg);
+        Clay_OnHover(OnButtonHovered, (intptr_t)CopyMsgToFrameArena(msg));
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .fontSize = 16,
@@ -345,7 +349,7 @@ Clay_RenderCommandArray CalcRender(CalcData *appData) {
                     MakeNumberButton(CLAY_STRING("9"), MOVE(MakeMsgDigit('9')));
                     MakeNumberButton(CLAY_STRING("6"), MOVE(MakeMsgDigit('6')));
                     MakeNumberButton(CLAY_STRING("3"), MOVE(MakeMsgDigit('3')));
-                    MakeOperationButton(CLAY_STRING("%"), NULL);
+                    MakeOperationButton(CLAY_STRING("%"), MOVE(MakeMsg(CALC_MSG_PLUS)));
                 }
 
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol3"))) {
