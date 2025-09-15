@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define ENSURE(x) if (!(x)) { int *y = 0; *y = 42; }
-#define MOVE(x) x
+#define ENSURE(x) if (!(x)) { printf("%s:%d: Ensure failed! ENSURE(%s)\n", __FILE__, __LINE__, #x); fflush(stdout); int *y = 0; *y = 42; }
+#define MOVE(x) (x)
 
 
 // ------------------------------------------------------------------------------------------
@@ -22,22 +22,22 @@ static const Clay_Color COLOR_BACKGROUND = (Clay_Color) {43, 41, 51, 255 };
 static const Clay_Color COLOR_NUMBER_BUTTON = (Clay_Color) {38, 38, 38, 255};
 static const Clay_Color COLOR_OPERATION_BUTTON = (Clay_Color) {24, 24, 27, 255};
 static const Clay_Color COLOR_SPECIAL_OPERATION_BUTTON = (Clay_Color) {30, 64, 175, 255};
+static const Clay_Color COLOR_HOVERED_BUTTON = (Clay_Color) {30, 64, 175, 255};
+static const Clay_Color COLOR_CLICKED_BUTTON = (Clay_Color) {23, 37, 84, 255};
 static const Clay_Color COLOR_CONTENT_BACKGROUND = { 90, 90, 90, 255 };
+static Clay_Color gSpecialButtonColor = (Clay_Color) {30, 64, 175, 255};
 
 typedef enum {
     CALC_MSG_DIGIT,
+    CALC_MSG_DOT,
     CALC_MSG_PLUS,
     CALC_MSG_EQUALS
+} CalcMsgType;
+
+typedef struct {
+    CalcMsgType type;
+    char digit;
 } CalcMsg;
-
-typedef struct {
-    CalcMsg msg;
-    uint8_t digit;
-} CalcMsgDigit;
-
-typedef struct {
-    CalcMsg msg;
-} CalcMsgOp;
 
 typedef struct {
     char *buffer;
@@ -50,6 +50,12 @@ typedef struct {
     size_t head;
     size_t tail;
 } CalcHistory;
+
+typedef struct {
+    CalcMsg *head;
+    size_t size;
+    size_t capacity;
+} CalcMsgQueue;
 
 typedef struct {
     uint8_t *base;
@@ -70,7 +76,7 @@ typedef struct {
 
     // ------------------------------------------------------------------------
     // Frame data: Data that lives as long as the frame
-    void *msgs;
+    CalcMsgQueue msgQueue;
 } CalcData;
 
 CalcData *gAppData;
@@ -102,6 +108,44 @@ CalcString CalcArenaAllocString(CalcArena *arena, size_t capacity) {
     };
 }
 
+void CalcStringAppend(CalcString *str, char x) {
+    if (str->size < str->capacity) {
+        str->buffer[str->size] = x;
+        str->size += 1ll;
+    }
+}
+
+void CalcStringCopy(CalcString *dest, CalcString *src) {
+    ENSURE(dest->capacity > src->size);
+    memcpy(dest->buffer, src->buffer, src->size);
+    dest->size = src->size;
+}
+
+void CalcStringClear(CalcString *str) {
+    str->size = 0;
+}
+
+double CalcStringToDouble(CalcString *str) {
+    double result = 0.0;
+    if (str->size > 0) {
+        char buffer[17];
+        buffer[str->size] = 0;
+        memcpy(buffer, str->buffer, str->size);
+        result = atof(buffer);
+    }
+
+    return result;
+}
+
+void CalcDoubleToString(CalcString *dest, double value) {
+    int size = snprintf(dest->buffer, dest->capacity, "%f", value);
+    while (dest->buffer[size - 1] == '0') {
+        size--;
+    }
+
+    dest->size = size;
+}
+
 CalcData *CalcInitialize(CalcArena appArena) {
     CalcArena frameArena = { .base = (uint8_t*)malloc(1024), .offset = 0, .capacity = 1024 };
 
@@ -114,7 +158,9 @@ CalcData *CalcInitialize(CalcArena appArena) {
         gAppData->history.data[i] = CalcArenaAllocString(&appArena, 16);
     }
 
-    gAppData->msgs = CalcArenaAlloc(&frameArena, 128);
+    gAppData->msgQueue.head = (CalcMsg*)CalcArenaAlloc(&frameArena, 128ll);
+    gAppData->msgQueue.size = 0ll;
+    gAppData->msgQueue.capacity = 128ll;
 
     gAppData->appArena = appArena;
     gAppData->frameArena = frameArena;
@@ -122,6 +168,34 @@ CalcData *CalcInitialize(CalcArena appArena) {
 }
 
 void CalcUpdate(CalcData *appData) {
+    CalcMsgQueue *msgQueue = &appData->msgQueue;
+    for (size_t i = 0ll; i < msgQueue->size; ++i) {
+        CalcMsg *msg = msgQueue->head + i;
+        switch (msg->type) {
+            case CALC_MSG_DIGIT:
+                CalcStringAppend(&appData->operand1, msg->digit);
+                break;
+            case CALC_MSG_DOT:
+                CalcStringAppend(&appData->operand1, '.');
+                break;
+            case CALC_MSG_EQUALS:
+                break;
+            case CALC_MSG_PLUS:
+                double op0 = CalcStringToDouble(&appData->operand0);
+                double op1 = CalcStringToDouble(&appData->operand1);
+                double result = op0 + op1;
+                CalcDoubleToString(&appData->operand0, result);
+                CalcStringClear(&appData->operand1);
+                break;
+        }
+
+        printf("[Calc] Msg: %d | Operand0: %.*s, | Operand1: %.*s\n",
+               msg->type,
+               (int)appData->operand0.size, appData->operand0.buffer,
+               (int)appData->operand1.size, appData->operand1.buffer);
+    }
+
+    msgQueue->size = 0;
 
 }
 
@@ -165,30 +239,45 @@ void MakeSpacer(Clay_Color color) {
     }
 }
 
-CalcMsgDigit *MakeMsgDigit(uint8_t digit) {
-    CalcMsgDigit *msg = (CalcMsgDigit*)CalcArenaAlloc(&gAppData->frameArena, sizeof(CalcMsgDigit));
-    msg->msg = CALC_MSG_DIGIT;
+void CalcQueueMsg(CalcMsg *msg) {
+    CalcMsg *slot = gAppData->msgQueue.head + gAppData->msgQueue.size;
+    memcpy(slot, msg, sizeof(CalcMsg));
+    gAppData->msgQueue.size += 1ll;
+}
+
+CalcMsg *MakeMsgDigit(uint8_t digit) {
+    CalcMsg *msg = (CalcMsg*)CalcArenaAlloc(&gAppData->frameArena, sizeof(CalcMsg));
+    msg->type = CALC_MSG_DIGIT;
     msg->digit = digit;
 
     return msg;
 }
 
-void OnNumberButtonHovered(Clay_ElementId elemendId, Clay_PointerData pointerInfo, intptr_t userData) {
-    CalcMsgDigit* msg = (CalcMsgDigit*)userData;
+CalcMsg *MakeMsg(CalcMsgType type) {
+    CalcMsg *msg = (CalcMsg*)CalcArenaAlloc(&gAppData->frameArena, sizeof(CalcMsg));
+    msg->type = type;
+
+    return msg;
+}
+
+void OnButtonHovered(Clay_ElementId elemendId, Clay_PointerData pointerInfo, intptr_t userData) {
+    CalcMsg* msg = (CalcMsg*)userData;
     if (pointerInfo.state == CLAY_POINTER_DATA_PRESSED_THIS_FRAME) {
-        printf("[Calc] OnNumberButtonPresssed: %d\n", msg->digit);
+        gSpecialButtonColor = COLOR_CLICKED_BUTTON;
     } else if (pointerInfo.state == CLAY_POINTER_DATA_RELEASED_THIS_FRAME) {
-        printf("[Calc] OnNumberButtonReleased: %d\n", msg->digit);
+        CalcQueueMsg(msg);
+        gSpecialButtonColor = COLOR_HOVERED_BUTTON;
+        /* printf("[Calc] OnNumberButtonReleased: %d\n", msg->digit); */
     }
 }
 
-void MakeNumberButton(Clay_String text, CalcMsgDigit* msg) {
+void MakeNumberButton(Clay_String text, CalcMsg *msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
-        .backgroundColor = Clay_Hovered() ? COLOR_SPECIAL_OPERATION_BUTTON : COLOR_NUMBER_BUTTON,
+        .backgroundColor = Clay_Hovered() ? gSpecialButtonColor : COLOR_NUMBER_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
-        Clay_OnHover(OnNumberButtonHovered, (intptr_t)msg);
+        Clay_OnHover(OnButtonHovered, (intptr_t)msg);
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .fontSize = 16,
@@ -197,12 +286,13 @@ void MakeNumberButton(Clay_String text, CalcMsgDigit* msg) {
     }
 }
 
-void MakeOperationButton(Clay_String text) {
+void MakeOperationButton(Clay_String text, CalcMsg *msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = COLOR_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
+        Clay_OnHover(OnButtonHovered, (intptr_t)msg);
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .fontSize = 16,
@@ -211,12 +301,13 @@ void MakeOperationButton(Clay_String text) {
     }
 }
 
-void MakeSpecialOperationButton(Clay_String text) {
+void MakeSpecialOperationButton(Clay_String text, CalcMsg *msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.5f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
         .backgroundColor = COLOR_SPECIAL_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
+        Clay_OnHover(OnButtonHovered, (intptr_t)msg);
         CLAY_TEXT(text, CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .fontSize = 16,
@@ -237,36 +328,36 @@ Clay_RenderCommandArray CalcRender(CalcData *appData) {
         CLAY(MakeRect(CLAY_ID("InputControls"), (Clay_Sizing) { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }, 8)) {
             CLAY(MakePanel(CLAY_ID("MainContent"), COLOR_CONTENT_BACKGROUND, CLAY_LEFT_TO_RIGHT, 8, CLAY_PADDING_ALL(8))) {
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol0"))) {
-                    MakeNumberButton(CLAY_STRING("7"), MOVE(MakeMsgDigit(7)));
-                    MakeNumberButton(CLAY_STRING("4"), MOVE(MakeMsgDigit(4)));
-                    MakeNumberButton(CLAY_STRING("1"), MOVE(MakeMsgDigit(1)));
-                    MakeNumberButton(CLAY_STRING("0"), MOVE(MakeMsgDigit(0)));
+                    MakeNumberButton(CLAY_STRING("7"), MOVE(MakeMsgDigit('7')));
+                    MakeNumberButton(CLAY_STRING("4"), MOVE(MakeMsgDigit('4')));
+                    MakeNumberButton(CLAY_STRING("1"), MOVE(MakeMsgDigit('1')));
+                    MakeNumberButton(CLAY_STRING("0"), MOVE(MakeMsgDigit('0')));
                 }
 
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol1"))) {
-                    MakeNumberButton(CLAY_STRING("8"), MOVE(MakeMsgDigit(8)));
-                    MakeNumberButton(CLAY_STRING("5"), MOVE(MakeMsgDigit(5)));
-                    MakeNumberButton(CLAY_STRING("2"), MOVE(MakeMsgDigit(2)));
-                    MakeOperationButton(CLAY_STRING("."));
+                    MakeNumberButton(CLAY_STRING("8"), MOVE(MakeMsgDigit('8')));
+                    MakeNumberButton(CLAY_STRING("5"), MOVE(MakeMsgDigit('5')));
+                    MakeNumberButton(CLAY_STRING("2"), MOVE(MakeMsgDigit('2')));
+                    MakeOperationButton(CLAY_STRING("."), MOVE(MakeMsg(CALC_MSG_DOT)));
                 }
 
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol2"))) {
-                    MakeNumberButton(CLAY_STRING("9"), MOVE(MakeMsgDigit(9)));
-                    MakeNumberButton(CLAY_STRING("6"), MOVE(MakeMsgDigit(6)));
-                    MakeNumberButton(CLAY_STRING("3"), MOVE(MakeMsgDigit(3)));
-                    MakeOperationButton(CLAY_STRING("%"));
+                    MakeNumberButton(CLAY_STRING("9"), MOVE(MakeMsgDigit('9')));
+                    MakeNumberButton(CLAY_STRING("6"), MOVE(MakeMsgDigit('6')));
+                    MakeNumberButton(CLAY_STRING("3"), MOVE(MakeMsgDigit('3')));
+                    MakeOperationButton(CLAY_STRING("%"), NULL);
                 }
 
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol3"))) {
-                    MakeOperationButton(CLAY_STRING("÷"));
-                    MakeOperationButton(CLAY_STRING("×"));
-                    MakeOperationButton(CLAY_STRING("-"));
-                    MakeOperationButton(CLAY_STRING("+"));
+                    MakeOperationButton(CLAY_STRING("÷"), MOVE(MakeMsg(CALC_MSG_PLUS)));
+                    MakeOperationButton(CLAY_STRING("×"), MOVE(MakeMsg(CALC_MSG_PLUS)));
+                    MakeOperationButton(CLAY_STRING("-"), MOVE(MakeMsg(CALC_MSG_PLUS)));
+                    MakeOperationButton(CLAY_STRING("+"), MOVE(MakeMsg(CALC_MSG_PLUS)));
                 }
 
                 CLAY(MakeColumn(CLAY_ID("ButtonsCol4"))) {
                     MakeSpacer(COLOR_CONTENT_BACKGROUND);
-                    MakeSpecialOperationButton(CLAY_STRING("="));
+                    MakeSpecialOperationButton(CLAY_STRING("="), MOVE(MakeMsg(CALC_MSG_EQUALS)));
                 }
             }
         }
@@ -685,6 +776,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     SDL_RenderPresent(state->rendererData.renderer);
 
+    fflush(stdout);
     return SDL_APP_CONTINUE;
 }
 
