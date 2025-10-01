@@ -7,7 +7,7 @@
 #include "clay.h"
 
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
 #define ENSURE(x) if (!(x)) { printf("%s:%d: Ensure failed! ENSURE(%s)\n", __FILE__, __LINE__, #x); fflush(stdout); int *y = 0; *y = 42; }
 #define MOVE(x) (x)
@@ -227,6 +227,13 @@ Clay_ElementDeclaration MakeColumn(Clay_ElementId id) {
     return column;
 }
 
+Clay_ElementDeclaration MakeOutputColumn(Clay_ElementId id) {
+    Clay_ElementDeclaration column = MakeRect(id, (Clay_Sizing) { .width = CLAY_SIZING_GROW(), .height = CLAY_SIZING_GROW(0) }, 8);
+    column.layout.layoutDirection = CLAY_TOP_TO_BOTTOM;
+    column.layout.childAlignment.x = CLAY_ALIGN_X_RIGHT;
+    return column;
+}
+
 Clay_ElementDeclaration MakeOutputPanel(Clay_ElementId id) {
     Clay_ElementDeclaration panel = MakePanel(id, COLOR_CONTENT_BACKGROUND, CLAY_TOP_TO_BOTTOM, 16, (Clay_Padding) {16, 16, 0 , 0});
     panel.layout.sizing.height = CLAY_SIZING_FIXED(300);
@@ -281,7 +288,11 @@ void OnButtonHovered(Clay_ElementId elemendId, Clay_PointerData pointerInfo, int
 
 void MakeNumberButton(Clay_String text, CalcMsg msg) {
     CLAY({
-        .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
+        .layout = { 
+            .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, 
+            .padding = { 16, 16, 8, 8 },
+            .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER }
+        },
         .backgroundColor = Clay_Hovered() ? gSpecialButtonColor : COLOR_NUMBER_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
@@ -296,7 +307,11 @@ void MakeNumberButton(Clay_String text, CalcMsg msg) {
 
 void MakeOperationButton(Clay_String text, CalcMsg msg) {
     CLAY({
-        .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
+        .layout = { 
+            .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, 
+            .padding = { 16, 16, 8, 8 },
+            .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER }
+        },
         .backgroundColor = Clay_Hovered() ? COLOR_HOVERED_SPECIAL_BUTTON : COLOR_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
@@ -311,7 +326,11 @@ void MakeOperationButton(Clay_String text, CalcMsg msg) {
 
 void MakeSpecialOperationButton(Clay_String text, CalcMsg msg) {
     CLAY({
-        .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.5f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
+        .layout = { 
+            .sizing = { .height = CLAY_SIZING_PERCENT(0.5f), .width = CLAY_SIZING_GROW(0) }, 
+            .padding = { 16, 16, 8, 8 },
+            .childAlignment = { .x = CLAY_ALIGN_X_CENTER, .y = CLAY_ALIGN_Y_CENTER }
+        },
         .backgroundColor = Clay_Hovered() ? COLOR_HOVERED_SPECIAL_BUTTON : COLOR_SPECIAL_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
@@ -331,12 +350,22 @@ Clay_RenderCommandArray CalcRender(CalcData *appData) {
 
     CLAY(MakePanel(CLAY_ID("OuterContainer"), COLOR_BACKGROUND, CLAY_TOP_TO_BOTTOM, 8, CLAY_PADDING_ALL(8))) {
         CLAY(MakeOutputPanel(CLAY_ID("OutputPanel"))) {
-            CLAY(MakeColumn(CLAY_ID("Outputs"))) {
-                Clay_String txt = (Clay_String){ .isStaticallyAllocated = false,
-                .length = appData->operand1.size,
-                .chars = appData->operand1.buffer };
-                /* printf("[Calc] %.*s\n", txt.length, txt.chars); */
-                CLAY_TEXT(txt, CLAY_TEXT_CONFIG({ .fontId = FONT_ID_BODY_16, .fontSize = 16, .textColor = { 255, 255, 255, 255 } }));
+            CLAY(MakeOutputColumn(CLAY_ID("Outputs"))) {
+                Clay_String op0 = (Clay_String) {
+                    .isStaticallyAllocated = false,
+                    .length = appData->operand0.size,
+                    .chars = appData->operand0.buffer
+                };
+
+                CLAY_TEXT(op0, CLAY_TEXT_CONFIG({ .fontId = FONT_ID_BODY_16, .fontSize = 16, .textColor = { 255, 255, 255, 255 } }));
+
+                Clay_String op1 = (Clay_String) {
+                    .isStaticallyAllocated = false,
+                    .length = appData->operand1.size,
+                    .chars = appData->operand1.buffer
+                };
+
+                CLAY_TEXT(op1, CLAY_TEXT_CONFIG({ .fontId = FONT_ID_BODY_16, .fontSize = 16, .textColor = { 255, 255, 255, 255 } }));
             }
         }
 
