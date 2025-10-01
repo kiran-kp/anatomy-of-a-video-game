@@ -23,6 +23,7 @@ static const Clay_Color COLOR_NUMBER_BUTTON = (Clay_Color) {38, 38, 38, 255};
 static const Clay_Color COLOR_OPERATION_BUTTON = (Clay_Color) {24, 24, 27, 255};
 static const Clay_Color COLOR_SPECIAL_OPERATION_BUTTON = (Clay_Color) {30, 64, 175, 255};
 static const Clay_Color COLOR_HOVERED_BUTTON = (Clay_Color) {30, 64, 175, 255};
+static const Clay_Color COLOR_HOVERED_SPECIAL_BUTTON = (Clay_Color) {30, 27, 75, 255};
 static const Clay_Color COLOR_CLICKED_BUTTON = (Clay_Color) {23, 37, 84, 255};
 static const Clay_Color COLOR_CONTENT_BACKGROUND = { 90, 90, 90, 255 };
 static Clay_Color gSpecialButtonColor = (Clay_Color) {30, 64, 175, 255};
@@ -71,6 +72,7 @@ typedef struct {
     // App data: Data that lives as long as the application does
     CalcString operand0;
     CalcString operand1;
+    CalcMsgType lastMessage;
 
     CalcHistory history;
 
@@ -153,6 +155,7 @@ CalcData *CalcInitialize(CalcArena appArena) {
 
     gAppData->operand0 = CalcArenaAllocString(&appArena, 16);
     gAppData->operand1 = CalcArenaAllocString(&appArena, 16);
+    gAppData->lastMessage = CALC_MSG_EQUALS;
 
     for (size_t i = 0; i < 16; i++) {
         gAppData->history.data[i] = CalcArenaAllocString(&appArena, 16);
@@ -184,6 +187,7 @@ void CalcUpdate(CalcData *appData) {
                 double op0 = CalcStringToDouble(&appData->operand0);
                 double op1 = CalcStringToDouble(&appData->operand1);
                 double result = op0 + op1;
+                appData->lastMessage = CALC_MSG_PLUS;
                 CalcDoubleToString(&appData->operand0, result);
                 CalcStringClear(&appData->operand1);
                 break;
@@ -293,7 +297,7 @@ void MakeNumberButton(Clay_String text, CalcMsg msg) {
 void MakeOperationButton(Clay_String text, CalcMsg msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.25f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
-        .backgroundColor = COLOR_OPERATION_BUTTON,
+        .backgroundColor = Clay_Hovered() ? COLOR_HOVERED_SPECIAL_BUTTON : COLOR_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
         Clay_OnHover(OnButtonHovered, (intptr_t)CopyMsgToFrameArena(msg));
@@ -308,7 +312,7 @@ void MakeOperationButton(Clay_String text, CalcMsg msg) {
 void MakeSpecialOperationButton(Clay_String text, CalcMsg msg) {
     CLAY({
         .layout = { .sizing = { .height = CLAY_SIZING_PERCENT(0.5f), .width = CLAY_SIZING_GROW(0) }, .padding = { 16, 16, 8, 8 }},
-        .backgroundColor = COLOR_SPECIAL_OPERATION_BUTTON,
+        .backgroundColor = Clay_Hovered() ? COLOR_HOVERED_SPECIAL_BUTTON : COLOR_SPECIAL_OPERATION_BUTTON,
         .cornerRadius = CLAY_CORNER_RADIUS(5)
     }) {
         Clay_OnHover(OnButtonHovered, (intptr_t)CopyMsgToFrameArena(msg));
@@ -326,7 +330,14 @@ Clay_RenderCommandArray CalcRender(CalcData *appData) {
     Clay_BeginLayout();
 
     CLAY(MakePanel(CLAY_ID("OuterContainer"), COLOR_BACKGROUND, CLAY_TOP_TO_BOTTOM, 8, CLAY_PADDING_ALL(8))) {
-        CLAY(MakeOutputPanel(CLAY_ID("Output"))) {
+        CLAY(MakeOutputPanel(CLAY_ID("OutputPanel"))) {
+            CLAY(MakeColumn(CLAY_ID("Outputs"))) {
+                Clay_String txt = (Clay_String){ .isStaticallyAllocated = false,
+                .length = appData->operand1.size,
+                .chars = appData->operand1.buffer };
+                /* printf("[Calc] %.*s\n", txt.length, txt.chars); */
+                CLAY_TEXT(txt, CLAY_TEXT_CONFIG({ .fontId = FONT_ID_BODY_16, .fontSize = 16, .textColor = { 255, 255, 255, 255 } }));
+            }
         }
 
         CLAY(MakeRect(CLAY_ID("InputControls"), (Clay_Sizing) { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0) }, 8)) {
